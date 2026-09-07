@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"find /Users/zhongqishuai/Projects/cldr_projects/anti_money_laundry_blueprint/.omc/plans -name \\\"*.md\\\" | xargs -I{} sh -c 'echo ===={}====; wc -l {}'\"}",
+  "error": "Exit code 1\nxargs: command line cannot be assembled, too long",
+  "timestamp": "2026-09-05T16:37:03.970Z",
+  "retry_count": 1
+}
