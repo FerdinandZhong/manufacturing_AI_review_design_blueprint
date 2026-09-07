@@ -9,3 +9,6 @@ numpy>=1.26.0
 scikit-learn>=1.4.0
 pylance>=0.13.0
 python-dotenv>=1.0.0
+
+# dev
+pytest>=8.0.0
