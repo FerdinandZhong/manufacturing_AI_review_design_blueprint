@@ -1,7 +1,8 @@
 data/*.db
 data/*.db-*
-data/raw/
-data/kb/
+data/raw/*
+!data/raw/.gitkeep
+data/kb/*.lance
 models/*.pkl
 models/*.joblib
 .env

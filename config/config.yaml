@@ -1,0 +1,32 @@
+llm:
+  provider: caii   # caii | vllm | ollama
+  caii:
+    endpoint: https://<workspace-domain>/namespaces/serving-default/endpoints/<endpoint-name>/v1
+    model: <model-id>
+    api_key: ""   # leave blank; JWT read from /tmp/jwt automatically in CML
+  vllm:
+    endpoint: http://localhost:8000/v1
+    model: meta-llama/Llama-3.1-8B-Instruct
+    api_key: ""
+  ollama:
+    endpoint: http://localhost:11434/v1
+    model: llama3.1:8b
+    api_key: ollama
+  temperature: 0.1
+  max_tokens: 4096
+
+data:
+  db_path: data/npi.db      # ops store
+  raw_dir: data/raw         # csv source fallback
+  kb_dir: data/kb           # lance dataset + raw assets
+
+source:
+  backend: auto             # auto | iceberg | csv  (Phase 1: csv)
+  csv_dir: data/raw
+
+demo:
+  showcase_program_id: PACK-ATLAS-01
+
+ml:
+  model_dir: models
+  seed: 42
