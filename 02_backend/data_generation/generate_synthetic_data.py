@@ -102,7 +102,7 @@ SHOWCASE_MARGIN = {
 # (Task 5's label=1 seed needs >=2 thermal rows correlated with failure so
 # is_thermal carries signal); everything else historical stays a safe PASS.
 HISTORICAL_BASE_MARGIN = {"range": 0.15, "energy_density": 0.15, "thermal": 0.15, "safety": 0.15, "cost": 0.15}
-HISTORICAL_THERMAL_OFFSET = {"PACK-ORION-00": -0.25, "PACK-VEGA-00": -0.25}  # 0.15 - 0.25 = -0.10 -> FAIL
+HISTORICAL_THERMAL_OFFSET = {"PACK-ORION-00": -0.25, "PACK-VEGA-00": -0.23}  # 0.15-0.25=-0.10, 0.15-0.23=-0.08 -> both FAIL
 
 
 def _historical_margins(program_id: str) -> dict:
