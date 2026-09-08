@@ -11,9 +11,10 @@ Test-bench formula (Task 3, pinned here so the numbers below make sense):
 Showcase (PACK-ATLAS-01) thermal is pinned to margin ~= +0.03 -> MARGINAL,
 everything else tested in the showcase lands margin ~= 0.15-0.25 -> PASS, and
 the showcase's cost requirement is deliberately left without a test_plans row
-(coverage gap). Historical PACK-ORION-00's thermal lands margin < 0 -> FAIL
-(the ML label=1 seed for Task 5); PACK-VEGA-00 and everything else historical
-lands PASS.
+(coverage gap). Historical PACK-ORION-00's and PACK-VEGA-00's thermal both
+land margin < 0 -> FAIL (the ML label=1 seed for Task 5 — two historical
+thermal FAILs give is_thermal a real correlation with the label); everything
+else historical lands PASS.
 """
 import sys
 import os
@@ -97,10 +98,11 @@ SHOWCASE_MARGIN = {
 }
 
 # Historical programs: fixed per-category base margin, with a fixed per-program
-# offset on thermal so ORION's thermal is the sole historical FAIL (Task 5's
-# label=1 seed) and VEGA's thermal (and everything else) is a safe PASS.
+# offset on thermal so BOTH ORION's and VEGA's thermal are historical FAILs
+# (Task 5's label=1 seed needs >=2 thermal rows correlated with failure so
+# is_thermal carries signal); everything else historical stays a safe PASS.
 HISTORICAL_BASE_MARGIN = {"range": 0.15, "energy_density": 0.15, "thermal": 0.15, "safety": 0.15, "cost": 0.15}
-HISTORICAL_THERMAL_OFFSET = {"PACK-ORION-00": -0.25, "PACK-VEGA-00": 0.0}  # 0.15 - 0.25 = -0.10 -> FAIL
+HISTORICAL_THERMAL_OFFSET = {"PACK-ORION-00": -0.25, "PACK-VEGA-00": -0.25}  # 0.15 - 0.25 = -0.10 -> FAIL
 
 
 def _historical_margins(program_id: str) -> dict:
@@ -261,7 +263,7 @@ if __name__ == "__main__":
     vega_thermal_spec = next(d for d in tables["design_specs"] if d["spec_id"] == "DS-VEGA-thermal")
     vega_thermal_test = next(t for t in tables["test_plans"] if t["test_id"] == "T-VEGA-thermal-01")
     vega_margin = (vega_thermal_spec["value"] - vega_thermal_test["target_value"]) / vega_thermal_test["target_value"]
-    assert vega_margin >= 0.10, f"historical VEGA thermal margin should be PASS, got {vega_margin}"
+    assert vega_margin < 0, f"historical VEGA thermal margin should be FAIL, got {vega_margin}"
 
     assert not any(t["req_id"] == "REQ-ATLAS-cost" for t in tables["test_plans"]), "cost coverage gap violated"
 
