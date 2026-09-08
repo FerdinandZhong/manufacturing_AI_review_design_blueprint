@@ -1,0 +1,12 @@
+classes:
+  Requirement:     {description: "An engineering requirement", modality: structured}
+  DesignImage:     {description: "CAD/thermal map illustrating a design", modality: image}
+  SpecSheet:       {description: "Component or design spec sheet", modality: pdf}
+  TestReport:      {description: "DVP&R test report / result excerpt", modality: text}
+  ComponentPhoto:  {description: "Photo of a physical component/module", modality: image}
+  RequirementDoc:  {description: "Source requirement document", modality: text}
+relations:
+  - {from: DesignImage,    rel: illustrates, to: Requirement}
+  - {from: TestReport,     rel: evidences,   to: TestPlan}
+  - {from: ComponentPhoto, rel: depicts,     to: Part}
+  - {from: SpecSheet,      rel: specifies,   to: DesignSpec}
