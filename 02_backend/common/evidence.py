@@ -56,10 +56,20 @@ def list_review_evidence(review_id: str) -> list[dict]:
 
 
 if __name__ == "__main__":
-    from common.db import init_db, get_connection
-    init_db()
+    import tempfile
+    from common import db as db_mod
+
+    # ponytail: override get_db_path on the db module (same mechanism db.py's own
+    # self-check uses) so get_connection()/init_db() — called both here and inside
+    # create_evidence/get_evidence/list_review_evidence — hit a throwaway DB, never
+    # the real one. A fresh DB has zero pre-existing rows, so the ordering issue in
+    # list_review_evidence (ORDER BY created_at with second-resolution timestamps)
+    # can't bite: there's nothing else to tie with.
+    _tmp_path = os.path.join(tempfile.mkdtemp(), "self_check.db")
+    db_mod.get_db_path = lambda: _tmp_path
+    db_mod.init_db()
     review_id = "GATE-SELFCHECK-01"
-    with get_connection() as _conn:
+    with db_mod.get_connection() as _conn:
         _conn.execute(
             "INSERT OR IGNORE INTO gate_reviews (review_id, program_id) VALUES (?, ?)",
             (review_id, "PACK-SELFCHECK-00"),
@@ -70,4 +80,4 @@ if __name__ == "__main__":
     assert fetched and fetched["review_id"] == review_id
     rows = list_review_evidence(review_id)
     assert rows and rows[0]["evidence_id"] == eid
-    print(f"evidence OK — created {eid}, {len(rows)} row(s) for {review_id}")
+    print(f"evidence OK — created {eid}, {len(rows)} row(s) for {review_id}, db {_tmp_path}")
