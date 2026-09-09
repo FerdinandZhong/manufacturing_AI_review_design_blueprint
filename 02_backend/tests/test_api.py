@@ -29,6 +29,12 @@ def client():
 
 # ── Step 1 floor: brief's 4 minimum checks ─────────────────────────────────
 
+def test_health(client):
+    r = client.get("/api/health")
+    assert r.status_code == 200
+    assert r.json() == {"status": "ok"}
+
+
 def test_list_programs_returns_three(client):
     r = client.get("/api/programs")
     assert r.status_code == 200

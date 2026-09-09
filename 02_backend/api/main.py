@@ -49,6 +49,11 @@ app.add_middleware(
 )
 
 
+@app.get("/api/health")
+def health():
+    return {"status": "ok"}
+
+
 def get_db():
     conn = get_connection()
     try:
@@ -227,6 +232,9 @@ if __name__ == "__main__":
 
     client = TestClient(app)
 
+    r = client.get("/api/health")
+    assert r.status_code == 200 and r.json() == {"status": "ok"}, r.json()
+
     r = client.get("/api/programs")
     assert r.status_code == 200 and len(r.json()) == 3, r.json()
 
@@ -244,4 +252,4 @@ if __name__ == "__main__":
     r = client.get("/api/programs/NOPE")
     assert r.status_code == 404
 
-    print("api.main OK — programs, risk, kb search, asset stream, 404 all pass")
+    print("api.main OK — health, programs, risk, kb search, asset stream, 404 all pass")
