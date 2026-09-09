@@ -136,7 +136,7 @@ def get_risk(pid: str):
 @app.get("/api/programs/{pid}/matrix")
 def get_matrix(pid: str):
     _get_program_or_404(pid)
-    return traceability.build_matrix(pid)
+    return _clean(traceability.build_matrix(pid))
 
 
 @app.post("/api/programs/{pid}/testbench")
@@ -194,6 +194,10 @@ def review_decision(review_id: str, body: DecisionBody, conn=Depends(get_db)):
     if body.decision not in _DECISIONS:
         raise HTTPException(400, f"decision must be one of {sorted(_DECISIONS)}")
 
+    exists = conn.execute("SELECT 1 FROM gate_reviews WHERE review_id=?", (review_id,)).fetchone()
+    if exists is None:
+        raise HTTPException(404, f"Gate review not found: {review_id}")
+
     annotation_id = f"ANN-{uuid.uuid4().hex[:12].upper()}"
     conn.execute(
         "INSERT INTO annotations(annotation_id,review_id,decision,rationale,adjudicator) VALUES(?,?,?,?,?)",
@@ -206,8 +210,6 @@ def review_decision(review_id: str, body: DecisionBody, conn=Depends(get_db)):
     conn.commit()
 
     row = conn.execute("SELECT * FROM gate_reviews WHERE review_id=?", (review_id,)).fetchone()
-    if row is None:
-        raise HTTPException(404, f"Gate review not found: {review_id}")
     return dict(row)
 
 

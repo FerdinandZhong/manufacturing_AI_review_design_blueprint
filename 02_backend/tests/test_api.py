@@ -136,3 +136,13 @@ def test_gate_review_stream_and_decision(client):
         json={"decision": "NOT_A_REAL_DECISION"},
     )
     assert r.status_code in (400, 422)
+
+
+def test_decision_404_for_unknown_review_id(client):
+    """Regression guard: a nonexistent review_id must 404, not 500 from an
+    unhandled FK IntegrityError on the annotations INSERT."""
+    r = client.post(
+        "/api/review/REV-DOES-NOT-EXIST/decision",
+        json={"decision": "APPROVED", "rationale": "n/a", "adjudicator": "tester"},
+    )
+    assert r.status_code == 404
