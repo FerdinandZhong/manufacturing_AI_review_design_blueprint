@@ -1,0 +1,95 @@
+name: Vehicle NPI Blueprint
+description: >-
+  Agentic vehicle New Product Introduction (NPI) gate-review platform for EV
+  battery-pack programs. Combines a deterministic engineering test bench and
+  traceability matrix, a CPU-trained design-risk model, a multimodal
+  (Lance-backed) knowledge base of prior-program assets, and a 5-agent
+  swarm that audits a program and produces a code-computed gate
+  recommendation. Powered by Cloudera AI Inferencing (with an offline
+  template-narration fallback).
+author: Cloudera
+specification_version: 1.0
+prototype_version: 1.0
+date: "2026-09-09"
+
+environment_variables:
+  BACKEND_PORT:
+    default: "7078"
+    description: "Localhost port the co-located FastAPI backend binds to"
+    required: false
+  LLM_PROVIDER:
+    default: "caii"
+    description: "LLM provider: caii, vllm, or ollama"
+    required: false
+
+runtimes:
+  - editor: JupyterLab
+    kernel: Python 3.11
+    edition: Standard
+
+tasks:
+  - type: run_session
+    name: Install Dependencies
+    script: 01_installer/install.py
+    kernel: python3
+    short_summary: Install Python packages, Node.js, and build the React frontend
+    long_summary: >-
+      Validates system resources, creates data and model directories, installs
+      Python dependencies from requirements.txt, ensures Node.js is available
+      via nvm, and builds the production React frontend bundle.
+    cpu: 2
+    memory: 4
+    gpu: 0
+
+  - type: run_session
+    name: Generate Synthetic Data
+    script: 02_backend/data_generation/generate_synthetic_data.py
+    kernel: python3
+    short_summary: Generate synthetic NPI programs, requirements, design specs, BOM, and test plans
+    long_summary: >-
+      Creates synthetic vehicle battery-pack NPI programs (requirements,
+      design specs, BOM, suppliers, test plans) as the read-only CSV source
+      of record, including one showcase program tuned so its thermal test
+      lands MARGINAL at the release gate. Deterministic — reruns produce
+      identical CSV content.
+    cpu: 2
+    memory: 2
+    gpu: 0
+
+  - type: run_session
+    name: Prepare Data, Model & KB
+    script: 02_backend/scripts/prepare.py
+    kernel: python3
+    short_summary: Init the ops DB, run the test bench, train the risk model, and build the knowledge base
+    long_summary: >-
+      One idempotent bootstrap: initializes the SQLite ops store, runs the
+      deterministic test bench for every program, trains the CPU-only
+      GradientBoostingClassifier design-risk model on historical programs,
+      scores the showcase program, and builds the Lance multimodal knowledge
+      base of ontology-validated prior-program assets. Prints a summary and
+      asserts the two demo invariants (showcase thermal test MARGINAL,
+      thermal risk band HIGH).
+    cpu: 2
+    memory: 4
+    gpu: 0
+
+  - type: start_application
+    name: Vehicle NPI Platform
+    subdomain: vehicle-npi-platform
+    script: 03_frontend/start_frontend.py
+    kernel: python3
+    short_summary: Launch the NPI gate-review dashboard and API in one app
+    long_summary: >-
+      Serves the production React frontend and runs the FastAPI backend in the
+      same application. The backend binds to localhost:7078 and the frontend
+      reverse-proxies /api requests to it (including the SSE gate-review
+      stream), so both services run inside a single CML application with no
+      cross-app networking. Binds to CDSW_APP_PORT.
+    cpu: 2
+    memory: 8
+    gpu: 0
+    environment_variables:
+      TASK_TYPE: START_APPLICATION
+      BACKEND_PORT:
+        default: "7078"
+        description: "Localhost port the co-located FastAPI backend binds to"

@@ -116,7 +116,7 @@ def run_npm(args, cwd=None):
 
 def install_frontend():
     """Install npm dependencies and build the React frontend."""
-    frontend_dir = os.path.join(PROJECT_ROOT, "03_application", "frontend")
+    frontend_dir = os.path.join(PROJECT_ROOT, "03_frontend")
     pkg_json = os.path.join(frontend_dir, "package.json")
 
     if not os.path.isfile(pkg_json):
@@ -183,10 +183,9 @@ def main():
     print("Next steps:")
     print("  1. Copy config: cp config/config.yaml.example config/config.yaml")
     print("     Then set your CAII endpoint in config/config.yaml")
-    print("  2. Build data and model (first run only):")
+    print("  2. Build data, DB, model & KB (first run only):")
     print("       python3 02_backend/data_generation/generate_synthetic_data.py")
-    print("       python3 02_backend/data_pipeline/feature_engineering.py")
-    print("       python3 02_backend/model_serving/train.py")
+    print("       python3 02_backend/scripts/prepare.py")
     print("  3. Start the app:   python3 start_app.py")
 
 

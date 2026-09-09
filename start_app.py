@@ -1,4 +1,14 @@
-"""Start both the FastAPI backend and the React frontend for the Vehicle NPI Blueprint."""
+"""Local-dev launcher for the Vehicle NPI Blueprint.
+
+Delegates to 03_frontend/start_frontend.py, which co-locates its own FastAPI
+backend child process (AML's single-CML-app pattern — see that file's
+docstring). This script does NOT spawn a second backend: 03_frontend/
+start_frontend.py already starts one bound to BACKEND_PORT, so spawning
+02_backend/start_backend.py here too would double-bind that port and one of
+the two would fail with "address already in use" (confirmed while wiring up
+Task 12 packaging). On CAI Workbench, the AMP's start_application task points
+directly at 03_frontend/start_frontend.py for the same reason.
+"""
 
 import os
 import sys
@@ -37,45 +47,25 @@ signal.signal(signal.SIGTERM, cleanup)
 def main():
     # Check prerequisites — warn but don't block
     db_path = os.path.join(PROJECT_ROOT, "data", "npi.db")
-    models_dir = os.path.join(PROJECT_ROOT, "models")
-    model_present = any(
-        f.endswith(".json") or f.endswith(".ubj")
-        for f in os.listdir(models_dir)
-        if os.path.isfile(os.path.join(models_dir, f))
-    ) if os.path.isdir(models_dir) else False
+    model_path = os.path.join(PROJECT_ROOT, "models", "risk_model.pkl")
 
-    if not os.path.exists(db_path) or not model_present:
+    if not os.path.exists(db_path) or not os.path.exists(model_path):
         print("WARNING: Database or trained model not found.")
-        print("  Build them first by running, in order:")
-        print("    python3 02_backend/data_generation/generate_synthetic_data.py")
-        print("    python3 02_backend/data_pipeline/feature_engineering.py")
-        print("    python3 02_backend/model_serving/train.py")
+        print("  Build them first by running:")
+        print("    python3 02_backend/scripts/prepare.py")
         print()
 
     env = os.environ.copy()
     env["BACKEND_PORT"] = str(BACKEND_PORT)
-    env["FRONTEND_PORT"] = str(FRONTEND_PORT)
+    env["CDSW_APP_PORT"] = str(FRONTEND_PORT)
 
-    # Start backend
-    print(f"Starting backend on port {BACKEND_PORT}...")
-    backend = subprocess.Popen(
-        [sys.executable, os.path.join(PROJECT_ROOT, "02_backend", "start_backend.py")],
-        env=env,
-        cwd=PROJECT_ROOT,
-    )
-    processes.append(backend)
-
-    # Give backend a moment to bind
-    time.sleep(2)
-
-    # Start frontend (prod if dist/ exists, else dev)
+    # Single process: 03_frontend/start_frontend.py starts its own co-located
+    # backend (see module docstring above) and serves the frontend. Do not
+    # also spawn 02_backend/start_backend.py here — that would double-bind
+    # BACKEND_PORT.
     dist_dir = os.path.join(PROJECT_ROOT, "03_frontend", "dist")
-    if os.path.isdir(dist_dir):
-        print(f"Starting frontend (production) on port {FRONTEND_PORT}...")
-        mode = "prod"
-    else:
-        print(f"Starting frontend (dev) on port {FRONTEND_PORT}...")
-        mode = "dev"
+    mode = "prod" if os.path.isdir(dist_dir) else "dev"
+    print(f"Starting app ({mode}) — backend on :{BACKEND_PORT}, frontend on :{FRONTEND_PORT}...")
 
     frontend = subprocess.Popen(
         [sys.executable, os.path.join(PROJECT_ROOT, "03_frontend", "start_frontend.py"), mode],
@@ -86,11 +76,9 @@ def main():
 
     print()
     print("=" * 55)
-    print(f"  Backend API:        http://localhost:{BACKEND_PORT}/api")
-    print(f"  Investigator UI:    http://localhost:{FRONTEND_PORT}/investigation")
-    print(f"  Model Ops UI:       http://localhost:{FRONTEND_PORT}/modelops")
+    print(f"  App:   http://localhost:{FRONTEND_PORT}")
     print("=" * 55)
-    print("Press Ctrl+C to stop both services.")
+    print("Press Ctrl+C to stop.")
     print()
 
     # Wait for either process to exit
