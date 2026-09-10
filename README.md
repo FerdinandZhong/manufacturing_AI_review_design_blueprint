@@ -1,162 +1,139 @@
-# Vehicle NPI Blueprint
+# Cloudera Blueprint: Vehicle NPI Gate Review
 
-An agentic gate-review platform for vehicle New Product Introduction (NPI)
-programs. It pairs a deterministic engineering test bench and traceability
-matrix with a CPU-only design-risk model, a multimodal knowledge base of
-prior-program assets, and a 5-agent swarm that audits a program and produces
-a code-computed gate recommendation for a human to approve.
+An AMP-ready prototype for EV battery-pack New Product Introduction (NPI) gate reviews. It demonstrates how a solution on Cloudera AI can combine engineering data queries, a Lance-backed multimodal knowledge base, traditional ML, and agentic AI into an auditable report for a human approver.
 
-## Demo narrative
+## Table of Contents
 
-`PACK-ATLAS-01`, an EV battery-pack NPI program, is at its release gate. Its
-thermal-runaway containment requirement has a razor-thin margin: the
-deterministic test bench measures the part against its design spec and
-verdicts the thermal test **MARGINAL** — not a failure, but not comfortable
-either. Independently, a traditional ML model (a `GradientBoostingClassifier`
-trained on requirement features from two completed historical programs)
-scores that same requirement's design risk as **HIGH**. The ML score didn't
-invent this — it's corroborated by the measured test result. Two different
-methods, one conclusion, that's the story we want the reviewer to see.
+- [Overview](#overview)
+- [Demo](#demo)
+- [Use Case](#use-case)
+- [Key Features](#key-features)
+- [Quickstart / Guide](#quickstart--guide)
+- [Architecture / Software Components](#architecture--software-components)
+- [Target Audience](#target-audience)
+- [Repository Structure](#repository-structure)
+- [Prerequisites](#prerequisites)
+- [Hardware Requirements](#hardware-requirements)
+- [Documentation](#documentation)
 
-Clicking **Run Gate Review** kicks off a 5-agent swarm (coverage,
-test-verdict, compliance, design-risk, knowledge-reuse) that audits the
-program in parallel, streaming its findings live over SSE. The DesignRisk
-agent explains *why* the model flagged the requirement (top feature
-importances, corroborated by the measured verdict). The KnowledgeReuse agent
-searches the Lance-backed knowledge base and retrieves a prior program's
-design image and test report — filtered through the engineering ontology so
-only valid asset classes are surfaced — to show how a similar issue was
-handled before. A supervisor then applies a pure, deterministic decision
-function (`decide(coverage, results, missing_standards)`) over the audited
-evidence to produce **PASS / CONDITIONAL / FAIL** — the LLM narrates *why*,
-it never decides. A human engineer reviews the evidence and makes the final
-gate call, which is persisted.
+## Overview
 
-## Quick start
+Vehicle NPI Gate Review helps manufacturing engineering teams decide whether a new battery-pack design can move through a release gate. The prototype runs on Cloudera AI Workbench as a private application. It brings requirements, designs, DVP&R test results, ML risk signals, and historical technical assets into one cockpit, while preserving the core rule: **code decides, LLM narrates**. The system computes every score, verdict, and recommendation deterministically; agentic AI assembles evidence and explains it for a human decision.
+
+## Demo
+
+The demo follows `PACK-ATLAS-01`, a new EV battery-pack design at a gate review. Its thermal-containment requirement is independently flagged by two signals: the traditional `GradientBoostingClassifier` scores the requirement **HIGH** risk from design requirements, design values, test-related features, and BOM context, while its DVP&R result is **MARGINAL**. Five workers collect traceability, test, compliance, design-risk, and knowledge-reuse evidence; the deterministic gate function returns **CONDITIONAL** for human review.
+
+Use [the demo storyline](docs/demo_storyline.md) for a guided walkthrough, or [the Chinese version](docs/demo_storyline_zh.md) for customer-facing narration.
+
+## Use Case
+
+Engineering teams often review requirements, design specifications, tests, standards, and past project documents in separate systems. This slows gate reviews and makes it difficult to explain why a product should proceed, pause, or require conditions. This blueprint shows a narrow, concrete pattern for combining those sources into a traceable gate-review report without letting an LLM control a safety or release decision.
+
+## Key Features
+
+- Deterministic APQP-style gate review for a battery-pack NPI program.
+- Traditional ML design-risk scoring with feature explanation and stable risk bands.
+- DVP&R test bench, requirement traceability, and standards-coverage checks.
+- Lance multimodal knowledge retrieval for design images, technical documents, test reports, and reference photographs.
+- Five-worker agentic workflow that gathers evidence and streams a narrative; a pure function computes PASS, CONDITIONAL, or FAIL.
+- Private Cloudera AI AMP application, API-v2 deployment automation, GitHub Actions validation, and an optional stdio MCP adapter.
+
+## Quickstart / Guide
+
+### Local demo
 
 ```bash
-pip install -r requirements.txt
-cp config/config.yaml.example config/config.yaml   # already present if you ran 01_installer/install.py
+python -m pip install -r requirements.txt
+cp config/config.yaml.example config/config.yaml
 python 02_backend/data_generation/generate_synthetic_data.py
-python 02_backend/scripts/prepare.py                # init DB, run test bench, train model, build KB
+python 02_backend/scripts/prepare.py
 python start_app.py
 ```
 
-Open `http://localhost:8100` (the port `start_app.py` prints). The single
-Dashboard A cockpit page shows the program's requirements, risk panel,
-traceability matrix, the gate-review runner, and the retrieved knowledge
-cards for `PACK-ATLAS-01`.
+Open the URL printed by `start_app.py` (normally `http://localhost:8100`). Run the Atlas gate review and inspect the requirements, risk panel, traceability matrix, workflow graph, knowledge cards, and report.
 
-`start_app.py` is the local-dev launcher: it delegates to
-`03_frontend/start_frontend.py`, which serves the production React build
-(if `03_frontend/dist/` exists, else the Vite dev server) and starts one
-co-located FastAPI backend as a child process, with `/api/*` reverse-proxied
-to it — including the long-lived SSE gate-review stream. This is the same
-single-process pattern the app uses when deployed as a CAI Applied ML
-Prototype (AMP) on CAI Workbench: the AMP's `start_application` task points
-directly at `03_frontend/start_frontend.py` for the same reason (a separate
-root-level backend launcher would double-bind `BACKEND_PORT`).
+No live LLM is required. When no configured provider is available, the workers and narrative use deterministic templates. Set `config/config.yaml` to use CAII, vLLM, or Ollama for narration; the LLM still cannot change computed outcomes.
 
-No live LLM is required to run the demo: `agents/narrative.py`'s `narrate()`
-falls back to a deterministic template string whenever no LLM provider is
-reachable, so the gate review runs and streams fully offline. Configure
-`config/config.yaml` (`caii` / `vllm` / `ollama`) if you want live narration.
+### Cloudera AI AMP
 
-## Cloudera AI AMP and GitHub deployment
+Import the repository through the AMP catalog. Run the declared tasks in order:
 
-This repository is an AMP. Import it through the Cloudera AI AMP catalog, then
-run its tasks in this order: **Install Dependencies → Generate Synthetic Data
-→ Prepare Data, Model & KB → Verify Prepared Demo → Vehicle NPI Platform**.
-The final task starts the private, SSO-protected application; it does not need
-an externally assigned port because Workbench supplies `CDSW_APP_PORT`.
+1. **Install Dependencies**
+2. **Generate Synthetic Data**
+3. **Prepare Data, Model & KB**
+4. **Verify Prepared Demo**
+5. **Vehicle NPI Platform**
 
-GitHub Actions validates the AMP manifest, backend/MCP tests, and frontend on
-pull requests and `main`. The `Deploy Vehicle NPI AMP to Cloudera AI` workflow
-then uses the project’s API-v2 automation to create or reuse the Workbench
-project, run its preparation Job, and create/restart the private application.
-Set these GitHub Actions secrets before enabling a deployment:
+The final task starts a private, SSO-protected application. Workbench assigns `CDSW_APP_PORT`; the application serves the frontend and proxies `/api` to a loopback FastAPI process.
 
-- `CML_HOST` — HTTPS Workbench origin.
-- `CML_API_KEY` — API v2 key with project, Job, and Application permissions.
-- `RUNTIME_IDENTIFIER` — Python 3.11 Standard runtime identifier.
-- `CML_PROJECT_ID` — optional existing project ID.
-- `CML_GIT_URL` — optional cloneable HTTPS source URL; it is required when
-  the repository’s default GitHub URL is not cloneable by the Workbench.
+### Automated deployment
 
-The workflow never forwards the deployment API key into a Job, Application, or
-MCP client. It publishes only the non-secret deployment result as an Actions
-artifact. See [cai_integration/README.md](cai_integration/README.md) for the
-same flow outside GitHub Actions.
+GitHub Actions validates the AMP manifest, backend/MCP tests, and frontend on pull requests and `main`. The manual or `main` deployment workflow uses CAI API-v2 automation to create or reuse a project, run preparation, then create/restart the private Application. Configure these GitHub Actions secrets: `CML_HOST`, `CML_API_KEY`, and `RUNTIME_IDENTIFIER`. Optionally set `CML_PROJECT_ID` for an existing project and `CML_GIT_URL` when the default repository URL is not cloneable by Workbench.
 
-## Architecture
+The deployment API key is never forwarded to an Application, Job, or MCP client. See [the CAI deployment guide](cai_integration/README.md) for exact commands and diagnostics.
 
-**Code decides, LLM narrates.** Every number a reviewer sees — test
-verdicts, coverage percentage, risk scores, the PASS/CONDITIONAL/FAIL
-recommendation — comes from a pure, deterministic function. The LLM (when
-available) is confined to writing human-readable prose *about* those
-already-computed facts; it is never on the path that produces a number or a
-decision. This keeps the demo reproducible and auditable.
+## Architecture / Software Components
 
-**Two-store split** (three, counting the knowledge base):
-- **CSV source** (`data/raw/`) — read-only system of record for NPI programs,
-  requirements, design specs, BOM, suppliers, and test plans. Written once by
-  `data_generation/generate_synthetic_data.py`; never mutated at runtime.
-- **SQLite ops store** (`data/npi.db`) — runtime state: test results, design-
-  risk scores, gate reviews, agent evidence, and human decisions. Rebuilt
-  idempotently by `common/db.py::init_db` plus the pipeline scripts.
-- **Lance multimodal KB** (`data/kb/assets.lance`) — a separate store of
-  ontology-validated prior-program assets (design images, test-report PDFs,
-  captions) with precomputed embeddings, used only for knowledge-reuse
-  retrieval. Never touched by the ops or source layers.
+```text
+Cloudera AI Workbench Application
+  React Program Cockpit on CDSW_APP_PORT
+    → /api proxy → FastAPI on 127.0.0.1:7078
+      → read-only CSV source: programs, requirements, designs, BOM, test plans
+      → SQLite operations store: test results, ML scores, reviews, evidence
+      → Lance knowledge base: image/document/text assets and embeddings
+      → deterministic test bench, traceability, ML risk model, gate function
+      → supervisor + five evidence workers → streamed narrative and report
 
-**ML ↔ ground-truth corroboration.** The design-risk model is trained on
-historical programs' requirement features (target/spec values, margin, BOM
-cost/mass, supplier quality, category flags) labeled by the deterministic
-test bench's own verdicts (`FAIL`/`MARGINAL` → positive label). Its score for
-the showcase program's thermal requirement is then checked against that same
-program's actual measured test verdict — the demo works because both signals
-agree, not because either one is hand-tuned to say "HIGH" in isolation.
-
-**Agentic gate review.** A supervisor dispatches five workers — coverage,
-test-verdict, compliance, design-risk, knowledge-reuse — each of which reads
-from the ops store (or the KB, for knowledge-reuse) and writes structured
-evidence rows. The supervisor then calls the same pure `decide()` function
-engineers can call directly, and streams `worker_done` / `evidence` /
-`recommendation` events over SSE so the frontend can render the review live.
-
-## What's built vs. what's next
-
-Built in this MVP: CSV source data + source layer, SQLite ops schema,
-deterministic test bench, traceability + gate decision, the sklearn
-design-risk model, the engineering ontology, the Lance multimodal knowledge
-base, the agent tools/state machine/evidence trail, the 5-worker supervisor
-with SSE streaming and template-fallback narration, the FastAPI backend, and
-the Dashboard A React frontend.
-
-Explicitly out of scope for Phase 1, left as seams for Phase 2+:
-- **Iceberg-via-MCP source backend** — `common/source.py` already has a
-  `source.backend: auto | iceberg | csv` config seam; only the CSV backend is
-  implemented today.
-- **Dashboard B** (engineering-ops / data-scientist view) — Dashboard A
-  (program cockpit) is the only frontend surface in this MVP.
-- **Richer multimodal embeddings** — the KB embeds captions with a
-  sentence-transformers model when available, falling back to a
-  deterministic token-hash embedding otherwise; true CLIP-style image
-  embeddings for the seeded design images are not implemented.
-- **Live lifecycle artifact generation** — seeded assets (design images,
-  test reports) are pre-generated fixtures, not produced by a live
-  generation pipeline.
-
-## Repo layout
-
+Optional external agent client
+  stdio npi-mcp → authenticated Application API
 ```
-01_installer/          Install script (Python deps, Node.js, frontend build)
-02_backend/             FastAPI backend: common/, engineering/, ml/, knowledge/,
-                        agents/, api/, data_generation/, scripts/, tests/
-03_frontend/            React + Vite dashboard, plus the co-located app launcher
-config/                 config.yaml (LLM provider, data paths, demo program)
-data/                   raw/ (CSV source), npi.db (ops store), kb/ (Lance dataset)
-models/                 risk_model.pkl + risk_meta.json
-start_app.py            Local-dev launcher (delegates to 03_frontend/start_frontend.py)
-.project-metadata.yaml  CAI Workbench AMP definition
-```
+
+The traditional ML model uses historical requirement and design features to produce risk scores. The agentic workflow queries every relevant component, persists evidence snapshots, and writes a trustworthy narrative around a recommendation produced only by the deterministic `decide()` function. The human project reviewer remains responsible for approval.
+
+## Target Audience
+
+- Manufacturing and NPI program managers running APQP or stage-gate reviews.
+- Battery-pack, validation, quality, and systems engineers who need evidence across requirements, design, tests, and standards.
+- Solution architects and data/AI teams evaluating Cloudera AI for governed data, ML, multimodal retrieval, and agentic workflow integration.
+
+## Repository Structure
+
+| Path | Description |
+| --- | --- |
+| `01_installer/` | Python dependency, Node.js, and frontend installer. |
+| `02_backend/` | FastAPI API, deterministic engineering logic, ML, Lance KB, agents, tests, and seed generation. |
+| `03_frontend/` | React cockpit and the Workbench application launcher. |
+| `cai_integration/` | API-v2 deployment automation, AMP validation, smoke checks, and runbook. |
+| `mcp_server/` | Separately installable `npi-mcp` stdio adapter for the Application API. |
+| `config/` | Example configuration for data locations and optional narration providers. |
+| `data/` | Generated CSV source, SQLite operations data, and Lance KB artifacts. |
+| `docs/` | Architecture, component contracts, development guide, user guide, and demo stories. |
+| `.project-metadata.yaml` | CAI AMP task manifest. |
+| `METADATA.yaml` | Blueprint catalog metadata. |
+
+## Prerequisites
+
+- Python 3.11 or later, Node.js 22.12 or later, and npm for local execution.
+- Cloudera AI Workbench access with a Python 3.11 Standard runtime for AMP use.
+- A CAI API-v2 key only for automated deployment; it is not required for the local demo and must not be used as an application or MCP token.
+- Optional CAII, vLLM, or Ollama endpoint for live narration. The offline demo runs without one.
+
+## Hardware Requirements
+
+| Deployment | Minimum |
+| --- | --- |
+| Local or AMP demo preparation | 2 CPU, 4 GB RAM, 2 GB free storage, no GPU |
+| CAI application | 2 CPU, 8 GB RAM, persistent project storage, no GPU |
+| Production extension | Size for source volume, concurrent reviews, model, and knowledge corpus; use managed storage and separate operational controls |
+
+## Documentation
+
+- [Project overview](docs/project-overview.md)
+- [Architecture](docs/architecture.md)
+- [Development guide](docs/development.md)
+- [Component and API contracts](docs/component-api.md)
+- [User guide](docs/user-guide.md)
+- [Demo storyline](docs/demo_storyline.md)
+- [CAI Workbench deployment plan](docs/workbench-deployment-plan.md)
+- [Iceberg and Lance lakehouse enhancement plan](docs/iceberg-lance-lakehouse-plan.md)

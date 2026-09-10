@@ -18,6 +18,7 @@ dist/
 docs/.claude/
 docs/.omc/
 docs/*.pptx
+artifacts/deck_review/
 
 .cai/
 .omc

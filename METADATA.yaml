@@ -1,0 +1,36 @@
+# Cloudera Blueprint catalog metadata
+name: "Vehicle NPI Gate Review"
+slug: "vehicle-npi-gate-review"
+description: "Auditable EV battery-pack gate reviews using Cloudera AI, deterministic ML, multimodal knowledge, and agentic evidence collection."
+reprise_link: ""
+
+catalog_classification:
+  - Launchable (AMP)
+launchable: true
+lifecycle_status: Active
+
+industry: Physical AI & Robotics
+industry_alignment: Vertical
+target_vertical: "Vehicle manufacturing"
+
+tags:
+  - manufacturing
+  - vehicle
+  - battery
+  - agentic-ai
+  - machine-learning
+  - multimodal-retrieval
+  - cloudera-ai
+
+product_mapping:
+  - Cloudera Machine Learning
+  - Cloudera AI Inference Service
+
+publisher: cloudera
+source: Internal
+public_github_link: "https://github.com/FerdinandZhong/manufacturing_AI_review_design_blueprint"
+
+maintainer_name: "Vehicle Manufacturing Blueprint team"
+date_created: "2026-09-07"
+date_updated: "2026-09-10"
+published_date: ""
