@@ -21,7 +21,7 @@ TRANSLATIONS: dict[int, dict[int, list[str | list[str]]]] = {
     15: {
         0: [["Autonomous Gate Review on Your Data", " (R&D Example)"]],
         1: ["Example: From a program at release gate to an auditable PASS / CONDITIONAL / FAIL decision—all on your data, with no egress."],
-        4: [["GATE REVIEW", "FLOW"]],
+        4: [["GATE ", "REVIEW"]],
         6: ["01 · INGEST", "Program enters gate"],
         8: ["The PACK-ATLAS-01 battery-pack program enters the release gate, triggering a five-agent review"],
         10: [["02 · ", "ENGINEERING AGENT"], "Coverage & test verdicts"],
@@ -44,7 +44,7 @@ TRANSLATIONS: dict[int, dict[int, list[str | list[str]]]] = {
     16: {
         0: [["Can the New Battery Design Pass the Gate Review", "?"]],
         1: ["A vehicle NPI prototype built and running in Cloudera AI Workbench, turning engineering data, ML risk and historical knowledge into auditable materials for human review."],
-        4: ["BUSINESS QUESTION"],
+        4: ["ASK"],
         5: ["Can PACK-ATLAS-01 be released?"],
         7: ["01  INPUT"],
         8: ["Program facts"],
@@ -54,7 +54,7 @@ TRANSLATIONS: dict[int, dict[int, list[str | list[str]]]] = {
             "• Current & historical DVP&R results",
             "• Historical design images & reports",
         ],
-        11: ["02  ANALYSIS"],
+        11: ["02  PROCESS"],
         12: ["ML + Agentic AI"],
         13: [
             "• Deterministic test bench & traceability",
@@ -113,7 +113,7 @@ TRANSLATIONS: dict[int, dict[int, list[str | list[str]]]] = {
         18: ["Talk track: ① ML surfaces predictive risk → ② tests and traceability provide independent facts → ③ the knowledge base adds historical context → click Run Gate Review"],
     },
     19: {
-        0: ["Gate Review | Five Agents Gather Evidence; Code Decides"],
+        0: ["Gate Review | Five Agents, One Code Decision"],
         1: ["Agents query, explain and cite evidence; the decision function reads deterministic results only. The LLM never scores or controls the flow."],
         4: ["Run Gate Review"],
         5: ["SSE live updates"],
@@ -179,11 +179,19 @@ CJK_RE = re.compile(r"[\u3400-\u4dbf\u4e00-\u9fff]")
 
 
 def layout_for_source_slide(target_prs: Presentation, source_slide):
-    source_layout_name = str(source_slide.slide_layout.part.partname).rsplit("/", 1)[-1]
+    source_matching_name = source_slide.slide_layout._element.get("matchingName")
+    source_layout_name = source_slide.slide_layout.name
     for layout in target_prs.slide_layouts:
-        if str(layout.part.partname).rsplit("/", 1)[-1] == source_layout_name:
+        if layout._element.get("matchingName") == source_matching_name:
             return layout
-    raise KeyError(f"No matching target layout for {source_layout_name}")
+    if source_matching_name == "DEFAULT":
+        for layout in target_prs.slide_layouts:
+            if layout._element.get("matchingName") == "Blank NO Footer (WHITE)":
+                return layout
+    for layout in target_prs.slide_layouts:
+        if layout.name == source_layout_name:
+            return layout
+    raise KeyError(f"No matching target layout for {source_matching_name or source_layout_name}")
 
 
 def clear_shapes(slide) -> None:

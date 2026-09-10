@@ -2,7 +2,7 @@
 
 ## Query from an agent sandbox
 
-Install with `python -m pip install ./mcp_server` and configure the agent host
+Install with `python -m pip install --upgrade ./mcp_server` and configure the agent host
 to launch `npi-mcp` over stdio. Set `NPI_API_BASE_URL` to the reachable application
 URL ending in `/api`. The sandbox only needs this package and HTTP access;
 it does not need the engineering data files or backend Python dependencies.

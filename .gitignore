@@ -23,3 +23,5 @@ artifacts/deck_review/
 .cai/
 .omc
 .claude
+
+**/*.egg-info/
