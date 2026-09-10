@@ -123,6 +123,19 @@ def test_asset_404_for_unknown(client):
     assert r.status_code == 404
 
 
+# ── injection-crash regression (final review Fix 1) ────────────────────────
+
+def test_kb_search_malformed_cls_does_not_500(client):
+    r = client.get("/api/kb/search", params={"q": "thermal", "cls": "'"})
+    assert r.status_code == 200
+    assert r.json() == []
+
+
+def test_asset_malformed_id_returns_404_not_500(client):
+    r = client.get("/api/asset/bad'id")
+    assert r.status_code == 404
+
+
 def test_gate_review_stream_and_decision(client):
     review_id = "REV-API-SELFCHECK"
     with client.stream("GET", f"/api/review/{SHOWCASE}/stream", params={"review_id": review_id}) as r:

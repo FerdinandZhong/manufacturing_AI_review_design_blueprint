@@ -5,9 +5,11 @@ data/raw/*
 data/kb/*.lance
 models/*.pkl
 models/*.joblib
+models/*.json
 .env
 __pycache__/
 *.pyc
 node_modules/
 dist/
 .DS_Store
+.claude/settings.local.json

@@ -16,6 +16,7 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(_
 sys.path.insert(0, os.path.join(PROJECT_ROOT, "02_backend"))
 
 import hashlib
+import re
 import numpy as np
 import pyarrow as pa
 import lance
@@ -124,6 +125,11 @@ def search(query: str, ontology_filter: str | None = None, k: int = 5) -> list[d
     this scale. Sorted by score desc with a stable asset_id tiebreak.
     ponytail: brute-force cosine, add a Lance vector index only if N grows
     past a few thousand rows."""
+    if ontology_filter is not None and ontology_filter not in ontology.classes():
+        # Unknown class legitimately has zero matches — safe to short-circuit
+        # instead of string-interpolating an unvalidated value into the
+        # Lance filter (which crashed on quotes / allowed tautology bypass).
+        return []
     ds = _open()
     filt = f"ontology_class = '{ontology_filter}'" if ontology_filter else None
     rows = ds.to_table(filter=filt).to_pylist()
@@ -146,7 +152,15 @@ def search(query: str, ontology_filter: str | None = None, k: int = 5) -> list[d
     return hits[:k]
 
 
+_ASSET_ID_RE = re.compile(r"[A-Za-z0-9_-]+")
+
+
 def get_asset(asset_id: str) -> dict:
+    if not _ASSET_ID_RE.fullmatch(asset_id):
+        # Malformed id (e.g. containing a quote) can't be a real asset_id —
+        # treat as not-found instead of letting it reach the Lance
+        # tokenizer, which raises an unhandled ValueError on bad syntax.
+        raise KeyError(f"asset not found: {asset_id}")
     ds = _open()
     rows = ds.to_table(filter=f"asset_id = '{asset_id}'").to_pylist()
     if not rows:

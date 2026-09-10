@@ -14,3 +14,33 @@ def test_search_is_deterministic():
     a = [h["asset_id"] for h in search("thermal", k=3)]
     b = [h["asset_id"] for h in search("thermal", k=3)]
     assert a == b
+
+
+# ── injection-crash regression (final review Fix 1) ────────────────────────
+
+def test_search_tautology_filter_returns_no_rows():
+    build_kb()
+    hits = search("thermal", ontology_filter="' OR '1'='1", k=10)
+    assert hits == []
+
+
+def test_search_bare_quote_filter_does_not_raise():
+    build_kb()
+    hits = search("thermal", ontology_filter="'", k=10)
+    assert hits == []
+
+
+def test_search_valid_class_still_filters():
+    build_kb()
+    hits = search("thermal", ontology_filter="DesignImage", k=10)
+    assert hits
+    assert all(h["ontology_class"] == "DesignImage" for h in hits)
+
+
+def test_get_asset_malformed_id_raises_keyerror_not_crash():
+    build_kb()
+    try:
+        get_asset("bad'id")
+        assert False, "expected KeyError"
+    except KeyError:
+        pass
