@@ -22,6 +22,7 @@ import sqlite3
 from urllib.parse import urlsplit
 from agents import llm_client
 import uuid
+from typing import Literal
 
 from fastapi import FastAPI, Depends, HTTPException, Query, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -108,6 +109,86 @@ _DECISIONS = {"APPROVED", "APPROVED_WITH_CONDITIONS", "REJECTED"}
 
 
 # ── programs ────────────────────────────────────────────────────────────────
+
+class QueryPage(BaseModel):
+    program_id: str
+    dataset: str
+    total: int
+    limit: int
+    offset: int
+    items: list[dict]
+    provenance: str
+
+
+@app.get('/api/programs/{pid}/data/{dataset}', response_model=QueryPage,
+         tags=['Engineering queries'], summary='Query requirements, designs, BOM, plans or stored test results')
+def query_program_data(pid: str, dataset: Literal['requirements', 'design', 'bom', 'test_plans', 'test_results'],
+                       q: str = Query(default='', max_length=200),
+                       requirement_id: str | None = Query(default=None, max_length=128),
+                       verdict: Literal['PASS', 'MARGINAL', 'FAIL'] | None = None,
+                       limit: int = Query(default=20, ge=1, le=100),
+                       offset: int = Query(default=0, ge=0)):
+    """Read stored engineering records with links to their requirement and test plan.
+
+    q is a case-insensitive literal text match. requirement_id follows BOM →
+    design → requirement links. verdict applies only to test_results.
+    Tests are persisted synthetic bench computations in this demo, not physical
+    laboratory measurements. This endpoint never runs the bench or scores ML.
+    """
+    _get_program_or_404(pid)
+    if verdict and dataset != 'test_results':
+        raise HTTPException(422, 'verdict is only supported for test_results')
+    loaders = {'requirements': source.list_requirements, 'design': source.list_design_specs,
+               'bom': source.list_bom, 'test_plans': source.list_test_plans,
+               'test_results': lambda p: TOOLS['get_test_results'](None, p)}
+    rows = _clean(loaders[dataset](pid))
+    if dataset == 'bom':
+        specs = {s['spec_id']: s for s in source.list_design_specs(pid)}
+        rows = [{**r, 'req_id': specs.get(r['spec_id'], {}).get('req_id')} for r in rows]
+    if dataset == 'test_results':
+        plans = {p['test_id']: p for p in source.list_test_plans(pid)}
+        rows = [{**r, 'test_plan': plans.get(r['test_id']),
+                 'req_id': plans.get(r['test_id'], {}).get('req_id')} for r in rows]
+    rows = [r for r in rows if (not requirement_id or r.get('req_id') == requirement_id)
+            and (not verdict or r.get('verdict') == verdict)
+            and (not q or q.casefold() in json.dumps(r, ensure_ascii=False).casefold())]
+    rows.sort(key=lambda r: json.dumps(r, sort_keys=True))
+    return QueryPage(program_id=pid, dataset=dataset, total=len(rows), limit=limit, offset=offset,
+                     items=rows[offset:offset + limit], provenance=(
+                         'Persisted synthetic test-bench results; not physical lab measurements'
+                         if dataset == 'test_results' else 'Seeded engineering reference data'))
+
+
+class AssetContent(BaseModel):
+    asset_id: str
+    mime_type: str
+    encoding: Literal['utf-8', 'base64']
+    content: str
+    provenance: str
+
+
+@app.get('/api/asset/{asset_id}/content', response_model=AssetContent,
+         tags=['Knowledge queries'], summary='Read the original document or image content')
+def read_asset_content(asset_id: str):
+    """Fetch bounded asset content for agents that cannot open browser preview links.
+
+    Text and SVG are UTF-8; raster images and PDF files are base64 encoded.
+    Images retain their source provenance. Content larger than 5 MiB is rejected.
+    """
+    import base64
+    try:
+        asset = kb.get_asset(asset_id)
+    except KeyError:
+        raise HTTPException(404, 'Asset not found')
+    blob = bytes(asset['blob'])
+    if len(blob) > 5 * 1024 * 1024:
+        raise HTTPException(413, 'Asset exceeds the 5 MiB agent content limit')
+    mime = get_asset(asset_id).media_type
+    is_text = mime.startswith('text/') or mime == 'image/svg+xml'
+    return AssetContent(asset_id=asset_id, mime_type=mime,
+                        encoding='utf-8' if is_text else 'base64',
+                        content=blob.decode('utf-8') if is_text else base64.b64encode(blob).decode('ascii'),
+                        provenance=asset.get('provenance', ''))
 
 @app.get("/api/programs")
 def list_programs():

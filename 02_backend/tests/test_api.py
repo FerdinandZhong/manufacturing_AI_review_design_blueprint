@@ -35,6 +35,23 @@ def test_health(client):
     assert r.json() == {"status": "ok"}
 
 
+def test_engineering_query_swagger_and_bounds(client):
+    schema = client.get('/api/openapi.json').json()
+    route = schema['paths']['/api/programs/{pid}/data/{dataset}']['get']
+    assert route['tags'] == ['Engineering queries']
+    assert 'QueryPage' in schema['components']['schemas']
+    assert 'AssetContent' in schema['components']['schemas']
+    base = f'/api/programs/{SHOWCASE}/data/'
+    assert client.get(base + 'requirements', params={'limit': 0}).status_code == 422
+    assert client.get(base + 'bom', params={'verdict': 'PASS'}).status_code == 422
+    assert client.get(base + 'unknown').status_code == 422
+    assert client.get('/api/programs/UNKNOWN/data/design').status_code == 404
+    response = client.get(base + 'requirements', params={'q': 'nonexistent literal'})
+    assert response.json()['total'] == 0
+    response = client.get(base + 'requirements', params={'limit': 1, 'offset': 1})
+    assert len(response.json()['items']) == 1 and response.json()['total'] == 5
+
+
 def test_list_programs_returns_three(client):
     r = client.get("/api/programs")
     assert r.status_code == 200
