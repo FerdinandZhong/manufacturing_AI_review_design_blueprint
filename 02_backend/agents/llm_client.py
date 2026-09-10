@@ -50,8 +50,8 @@ def _resolve_registered() -> dict | None:
         return None
 
 
-def _make_client() -> tuple[OpenAI, str, dict]:
-    """Return (client, model, kwargs). A registered active model (Models view)
+def _make_client() -> tuple[OpenAI, str]:
+    """Return (client, model). A registered active model (Models view)
     wins; else a UI endpoint pick; else the static provider config."""
     cfg = get_config()["llm"]
     reg = _resolve_registered()
@@ -69,6 +69,10 @@ def _make_client() -> tuple[OpenAI, str, dict]:
         api_key = pcfg.get("api_key") or "no-key"
         model = (_endpoint_override or {}).get("model") or pcfg.get("model")
 
+    if not model or not endpoint or "<" in endpoint:
+        if not (reg and model and endpoint is None):
+            raise RuntimeError("No LLM endpoint configured; using deterministic narration")
+
     # CML JWT fallback (only when no explicit key was resolved)
     if not api_key or api_key == "no-key":
         jwt_path = "/tmp/jwt"
@@ -82,7 +86,7 @@ def _make_client() -> tuple[OpenAI, str, dict]:
     cache_key = (endpoint or "", api_key or "")
     client = _client_cache.get(cache_key)
     if client is None:
-        client = OpenAI(base_url=endpoint, api_key=api_key, max_retries=3)
+        client = OpenAI(base_url=endpoint, api_key=api_key, timeout=20, max_retries=0)
         _client_cache[cache_key] = client
     return client, model
 
@@ -175,3 +179,13 @@ def chat(messages: list[dict], stream: bool = False) -> "str | Generator":
                 yield delta
 
     return _gen()
+
+
+if __name__ == "__main__":
+    import tempfile
+    import common.db as db
+    _tmp = tempfile.mkdtemp()
+    db.get_db_path = lambda: os.path.join(_tmp, "self_check.db")
+    db.init_db()
+    assert _resolve_registered() is None
+    print("llm_client OK")

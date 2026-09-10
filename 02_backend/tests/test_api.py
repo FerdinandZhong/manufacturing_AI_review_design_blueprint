@@ -65,6 +65,15 @@ def test_asset_returns_bytes(client):
     assert len(r.content) > 0
 
 
+def test_asset_metadata_has_no_blob(client):
+    from knowledge.kb import search
+    asset_id = search("thermal", k=1)[0]["asset_id"]
+    r = client.get(f"/api/asset/{asset_id}/metadata")
+    assert r.status_code == 200
+    assert r.json()["asset_id"] == asset_id
+    assert "blob" not in r.json() and r.json()["preview_path"].endswith(asset_id)
+
+
 # ── extra coverage beyond the floor ────────────────────────────────────────
 
 def test_get_program_envelope(client):
@@ -165,3 +174,28 @@ def test_decision_404_for_unknown_review_id(client):
         json={"decision": "APPROVED", "rationale": "n/a", "adjudicator": "tester"},
     )
     assert r.status_code == 404
+
+
+def test_json_review_is_idempotent_and_persists_evidence(client):
+    body = {"request_id": "api-contract-review-1"}
+    first = client.post(f"/api/programs/{SHOWCASE}/reviews", json=body)
+    assert first.status_code == 200, first.text
+    report = first.json()
+    assert report["execution_status"] == "completed"
+    assert report["recommendation"] == "CONDITIONAL"
+    assert len(report["worker_results"]) == 5
+
+    second = client.post(f"/api/programs/{SHOWCASE}/reviews", json=body)
+    assert second.status_code == 200
+    assert second.json()["review_id"] == report["review_id"]
+
+    fetched = client.get(f"/api/reviews/{report['review_id']}")
+    assert fetched.status_code == 200 and fetched.json()["recommendation"] == "CONDITIONAL"
+    evidence = client.get(f"/api/reviews/{report['review_id']}/evidence", params={"limit": 20})
+    assert evidence.status_code == 200 and evidence.json()["evidence"]
+    assert all("payload_json" in row for row in evidence.json()["evidence"])
+
+
+def test_review_request_and_kb_bounds_are_validated(client):
+    assert client.post(f"/api/programs/{SHOWCASE}/reviews", json={"request_id": "bad id"}).status_code == 422
+    assert client.get("/api/kb/search", params={"q": "thermal", "k": 21}).status_code == 422

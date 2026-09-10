@@ -14,9 +14,13 @@ def get_config() -> dict:
         if os.path.exists(_dotenv):
             load_dotenv(_dotenv)
         _cfg_path = os.path.join(PROJECT_ROOT, "config", "config.yaml")
+        if not os.path.isfile(_cfg_path):
+            _cfg_path += ".example"
         with open(_cfg_path) as f:
             _config = yaml.safe_load(f)
         _resolve_workspace_domain(_config)
+        if os.environ.get("LLM_PROVIDER"):
+            _config.setdefault("llm", {})["provider"] = os.environ["LLM_PROVIDER"]
     return _config
 
 
@@ -41,3 +45,9 @@ def get_db_path() -> str:
     if os.path.isabs(raw):
         return raw
     return os.path.join(PROJECT_ROOT, raw)
+
+
+if __name__ == "__main__":
+    assert isinstance(get_config(), dict)
+    assert os.path.isabs(get_db_path())
+    print("config self-check OK")

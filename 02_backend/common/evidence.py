@@ -11,8 +11,11 @@ from typing import Any
 from common.db import get_connection
 
 
-def _new_evidence_id() -> str:
-    return f"EVD-{uuid.uuid4().hex[:12].upper()}"
+def _new_evidence_id(review_id: str, tool: str, query: str, payload_hash: str, agent_worker: str) -> str:
+    """Stable evidence identity: the same deterministic worker input cannot
+    silently produce duplicate lineage rows for one review."""
+    key = f"{review_id}|{tool}|{query}|{payload_hash}|{agent_worker}"
+    return f"EVD-{uuid.uuid5(uuid.NAMESPACE_URL, key).hex[:12].upper()}"
 
 
 def create_evidence(
@@ -26,13 +29,14 @@ def create_evidence(
     payload_hash = hashlib.sha256(
         json.dumps(payload, sort_keys=True, default=str).encode()
     ).hexdigest()
-    evidence_id = _new_evidence_id()
+    payload_json = json.dumps(payload, sort_keys=True, default=str)
+    evidence_id = _new_evidence_id(review_id, tool, query, payload_hash, agent_worker)
     with get_connection() as conn:
         conn.execute(
-            """INSERT INTO evidence
-               (evidence_id, review_id, tool, query, payload_hash, data_version, agent_worker)
-               VALUES (?, ?, ?, ?, ?, ?, ?)""",
-            (evidence_id, review_id, tool, query, payload_hash, data_version, agent_worker),
+            """INSERT OR IGNORE INTO evidence
+               (evidence_id, review_id, tool, query, payload_hash, data_version, agent_worker, payload_json)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (evidence_id, review_id, tool, query, payload_hash, data_version, agent_worker, payload_json),
         )
     return evidence_id
 
@@ -46,10 +50,11 @@ def get_evidence(evidence_id: str) -> dict | None:
     return dict(row) if row else None
 
 
-def list_review_evidence(review_id: str) -> list[dict]:
+def list_review_evidence(review_id: str, limit: int = 100, offset: int = 0) -> list[dict]:
     conn = get_connection()
     rows = conn.execute(
-        "SELECT * FROM evidence WHERE review_id = ? ORDER BY created_at", (review_id,)
+        "SELECT * FROM evidence WHERE review_id = ? ORDER BY created_at, evidence_id LIMIT ? OFFSET ?",
+        (review_id, limit, offset),
     ).fetchall()
     conn.close()
     return [dict(r) for r in rows]

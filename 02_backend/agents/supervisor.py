@@ -22,6 +22,7 @@ Two-store rule: the one legitimate mutation here is the gate_reviews row
 """
 import sys
 import os
+import json
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.join(PROJECT_ROOT, "02_backend"))
@@ -64,7 +65,7 @@ def run_gate_review(review_id: str, program_id: str) -> Generator[dict, None, No
     # the recommendation + narrative are known.
     with get_connection() as conn:
         conn.execute(
-            "INSERT OR IGNORE INTO gate_reviews (review_id, program_id, state) VALUES (?, ?, ?)",
+            "INSERT OR IGNORE INTO gate_reviews (review_id, program_id, state, execution_status) VALUES (?, ?, ?, 'running')",
             (review_id, program_id, state.value),
         )
 
@@ -105,8 +106,9 @@ def run_gate_review(review_id: str, program_id: str) -> Generator[dict, None, No
 
     with get_connection() as conn:
         conn.execute(
-            "UPDATE gate_reviews SET recommendation=?, narrative=? WHERE review_id=?",
-            (rec, narrative_text, review_id),
+            "UPDATE gate_reviews SET recommendation=?, narrative=?, worker_results=?, "
+            "execution_status='completed', execution_error=NULL, completed_at=datetime('now') WHERE review_id=?",
+            (rec, narrative_text, json.dumps(findings_list, sort_keys=True), review_id),
         )
 
     transition(state, ProgramState.RELEASED)
@@ -119,10 +121,16 @@ if __name__ == "__main__":
     from ml.train import train
     from knowledge.kb import build_kb
 
+    import tempfile
+    import common.db as db
+    _tmp = tempfile.mkdtemp()
+    db.get_db_path = lambda: os.path.join(_tmp, "self_check.db")
     init_db()
     for _p in ["PACK-ORION-00", "PACK-VEGA-00", "PACK-ATLAS-01"]:
         run_test_bench(_p)
     train()
+    from ml.risk_model import score_program
+    score_program("PACK-ATLAS-01")
     build_kb()
 
     events = list(run_gate_review("REV-SUPERVISOR-SELFCHECK", "PACK-ATLAS-01"))

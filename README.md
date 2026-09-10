@@ -62,6 +62,32 @@ falls back to a deterministic template string whenever no LLM provider is
 reachable, so the gate review runs and streams fully offline. Configure
 `config/config.yaml` (`caii` / `vllm` / `ollama`) if you want live narration.
 
+## Cloudera AI AMP and GitHub deployment
+
+This repository is an AMP. Import it through the Cloudera AI AMP catalog, then
+run its tasks in this order: **Install Dependencies → Generate Synthetic Data
+→ Prepare Data, Model & KB → Verify Prepared Demo → Vehicle NPI Platform**.
+The final task starts the private, SSO-protected application; it does not need
+an externally assigned port because Workbench supplies `CDSW_APP_PORT`.
+
+GitHub Actions validates the AMP manifest, backend/MCP tests, and frontend on
+pull requests and `main`. The `Deploy Vehicle NPI AMP to Cloudera AI` workflow
+then uses the project’s API-v2 automation to create or reuse the Workbench
+project, run its preparation Job, and create/restart the private application.
+Set these GitHub Actions secrets before enabling a deployment:
+
+- `CML_HOST` — HTTPS Workbench origin.
+- `CML_API_KEY` — API v2 key with project, Job, and Application permissions.
+- `RUNTIME_IDENTIFIER` — Python 3.11 Standard runtime identifier.
+- `CML_PROJECT_ID` — optional existing project ID.
+- `CML_GIT_URL` — optional cloneable HTTPS source URL; it is required when
+  the repository’s default GitHub URL is not cloneable by the Workbench.
+
+The workflow never forwards the deployment API key into a Job, Application, or
+MCP client. It publishes only the non-secret deployment result as an Actions
+artifact. See [cai_integration/README.md](cai_integration/README.md) for the
+same flow outside GitHub Actions.
+
 ## Architecture
 
 **Code decides, LLM narrates.** Every number a reviewer sees — test

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { WorkflowGraph, type WorkflowNode } from './WorkflowGraph'
 import { PlayCircle } from 'lucide-react'
 import type { PipelineItem } from './PipelineStream'
 import { PipelineStream } from './PipelineStream'
@@ -21,15 +22,12 @@ const REC_CLS: Record<string, string> = {
 
 interface Props {
   programId: string
-  onReviewDone: (reviewId: string) => void
+  onReviewDone: (reviewId: string | null) => void
 }
 
-/** Marquee component: runs the SSE gate review, renders worker cards via
- *  PipelineStream, streams the narrative, and badges the recommendation.
- *  The backend has no live LLM here — every worker times out to its
- *  deterministic template fallback, so the whole stream takes ~80s. That's
- *  expected; the per-worker "running" spinner (via PipelineStream) covers it. */
 export const GateReview: React.FC<Props> = ({ programId, onReviewDone }) => {
+  const [error, setError] = useState('')
+  const [started, setStarted] = useState<string[]>([])
   const [running, setRunning] = useState(false)
   const [activePhase, setActivePhase] = useState<string | null>(null)
   const [items, setItems] = useState<PipelineItem[]>([])
@@ -39,6 +37,9 @@ export const GateReview: React.FC<Props> = ({ programId, onReviewDone }) => {
 
   const run = () => {
     const id = `REV-${Date.now()}`
+    onReviewDone(null)
+    setError('')
+    setStarted([])
     setReviewId(null)
     setRunning(true)
     setActivePhase(null)
@@ -48,10 +49,13 @@ export const GateReview: React.FC<Props> = ({ programId, onReviewDone }) => {
       key, label, status: 'running' as const,
     })))
 
+    let completed = false
     streamReview(programId, id, evt => {
       const type = evt.type as string
       if (type === 'phase') {
         setActivePhase(evt.phase as string)
+      } else if (type === 'worker_start') {
+        setStarted(prev => [...prev, evt.worker as string])
       } else if (type === 'worker_done') {
         const worker = evt.worker as string
         setItems(prev => prev.map(it => it.key === worker
@@ -62,12 +66,24 @@ export const GateReview: React.FC<Props> = ({ programId, onReviewDone }) => {
       } else if (type === 'token') {
         setNarrative(prev => prev + (evt.text as string))
       } else if (type === 'done') {
+        completed = true
         setRunning(false)
         setReviewId(id)
         onReviewDone(id)
       }
-    }).catch(() => setRunning(false))
+    }).then(() => { if (!completed) throw new Error('Review stream ended before completion. Please retry.') })
+      .catch((err: Error) => { setRunning(false); setError(err.message); setItems(prev => prev.map(it => it.status === 'running' ? { ...it, status: 'error' } : it)) })
   }
+
+  const nodes: WorkflowNode[] = [
+    { id: 'supervisor', label: 'Supervisor', status: items.length ? 'completed' : 'pending' },
+    ...Object.entries(WORKER_LABEL).map(([id, label]): WorkflowNode => {
+      const item = items.find(it => it.key === id)
+      return { id, label, status: item?.status === 'ok' ? 'completed' : item?.status === 'error' ? 'error' : started.includes(id) ? 'running' : 'pending' }
+    }),
+    { id: 'decision', label: 'Code decision', status: recommendation ? 'completed' : error ? 'error' : 'pending' },
+    { id: 'narrative', label: 'Gate narrative', status: reviewId ? 'completed' : error ? 'error' : activePhase === 'ANALYZING' ? 'running' : 'pending' },
+  ]
 
   return (
     <div className="bg-surface-1 rounded-lg shadow-soft p-4 space-y-3">
@@ -91,6 +107,8 @@ export const GateReview: React.FC<Props> = ({ programId, onReviewDone }) => {
         </div>
       </div>
 
+      <WorkflowGraph nodes={nodes} running={running} />
+      {error && <p role="alert" className="text-sm text-aml-red">{error}</p>}
       <PipelineStream
         phases={PHASES}
         activePhase={activePhase}

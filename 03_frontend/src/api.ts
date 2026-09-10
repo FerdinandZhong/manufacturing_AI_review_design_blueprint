@@ -146,6 +146,9 @@ export const getMatrix = (pid: string) =>
 // ── knowledge base / ontology ───────────────────────────────────────────────
 
 export interface KbHit {
+  provenance?: string
+  source_url?: string
+  license_url?: string
   asset_id: string
   ontology_class: string
   modality: 'image' | 'pdf' | 'text'
@@ -219,4 +222,37 @@ export const streamReview = (
   onEvent: (e: Record<string, unknown>) => void,
 ) =>
   fetch(`/api/review/${pid}/stream?review_id=${encodeURIComponent(reviewId)}`)
-    .then(res => streamSSE(res, onEvent))
+    .then(res => { if (!res.ok) throw new Error(`Review failed (${res.status})`); return streamSSE(res, onEvent) })
+
+export interface LlmModel {
+  id: number
+  alias: string
+  provider: string
+  model_identifier: string
+  api_base: string | null
+  api_key: string        // masked from the server
+  is_active: number
+}
+
+export interface RegisterModelBody {
+  alias: string
+  provider: string
+  model_identifier: string
+  api_base?: string
+  api_key?: string
+}
+
+export const getLlmModels = () =>
+  api.get<{ models: LlmModel[] }>('/config/llm/models').then(r => r.data.models)
+
+export const registerLlmModel = (body: RegisterModelBody) =>
+  api.post('/config/llm/models', body).then(r => r.data)
+
+export const activateLlmModel = (id: number) =>
+  api.post(`/config/llm/models/${id}/activate`).then(r => r.data)
+
+export const updateLlmModel = (id: number, body: RegisterModelBody) =>
+  api.put(`/config/llm/models/${id}`, body).then(r => r.data)
+
+export const testLlmModel = (id: number) =>
+  api.post<{ ok: boolean; message: string }>(`/config/llm/models/${id}/test`).then(r => r.data)

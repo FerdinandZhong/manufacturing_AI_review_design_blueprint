@@ -1,149 +1,31 @@
-import { GitBranch } from 'lucide-react'
-
 export interface WorkflowNode {
   id: string
   label: string
   status: 'pending' | 'running' | 'completed' | 'skip' | 'error'
-  llmCalls?: number
-  tools?: { name: string; error?: boolean }[]
 }
+const colors = { pending: '#9aa1ac', running: '#e35b1f', completed: '#059669', skip: '#9aa1ac', error: '#dc2626' }
 
-interface Props {
-  nodes: WorkflowNode[]
-  running?: boolean
-}
-
-// Light-theme colors (SVG fill/stroke need literal hex, not CSS classes).
-const STATUS_COLORS: Record<WorkflowNode['status'], { fill: string; stroke: string; text: string }> = {
-  pending:   { fill: '#f7f8fa', stroke: '#d5d9e0', text: '#9aa1ac' },
-  running:   { fill: '#fff4ee', stroke: '#e35b1f', text: '#e35b1f' },
-  completed: { fill: '#ecfdf3', stroke: '#059669', text: '#059669' },
-  skip:      { fill: '#f7f8fa', stroke: '#9aa1ac', text: '#9aa1ac' },
-  error:     { fill: '#fef2f2', stroke: '#dc2626', text: '#dc2626' },
-}
-
-const NODE_W = 130
-const NODE_H = 50
-const H_GAP  = 34
-const ARROW  = 8
-const SVG_H  = 120
-
-/** Presentational live DAG for an agent pipeline — ported from the Agent Studio
- *  WorkflowGraph reference, recolored to the app's light theme. */
-export const WorkflowGraph: React.FC<Props> = ({ nodes, running }) => {
-  if (nodes.length === 0) return null
-
-  const idxById: Record<string, number> = {}
-  nodes.forEach((n, i) => { idxById[n.id] = i })
-
-  const totalW = nodes.length * NODE_W + (nodes.length - 1) * H_GAP
-  const svgW   = totalW + 40
-  const cx = (i: number) => 20 + i * (NODE_W + H_GAP) + NODE_W / 2
-  const cy = SVG_H / 2 - 8
-
-  const doneCount = nodes.filter(n => n.status === 'completed').length
-
-  return (
-    <div className="bg-surface-1 rounded-lg shadow-soft overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center gap-2 border-b border-surface-3 px-4 py-2">
-        <GitBranch className={`w-3 h-3 ${running ? 'text-accent animate-pulse' : 'text-ink-faint'}`} />
-        <span className="text-2xs font-semibold tracking-wider uppercase text-ink-muted">
-          Workflow Graph
-        </span>
-        <span className="ml-auto text-2xs text-ink-faint">{doneCount}/{nodes.length} done</span>
-      </div>
-
-      {/* SVG DAG */}
-      <div className="overflow-x-auto px-2 py-2">
-        <svg viewBox={`0 0 ${svgW} ${SVG_H}`} width="100%" style={{ maxHeight: SVG_H, minWidth: totalW + 40 }}>
-          {/* Edges */}
-          {nodes.slice(0, -1).map((n, i) => {
-            const x1 = cx(i) + NODE_W / 2
-            const x2 = cx(i + 1) - NODE_W / 2
-            return (
-              <g key={`${n.id}-edge`}>
-                <line x1={x1} y1={cy} x2={x2 - ARROW} y2={cy} stroke="#d5d9e0" strokeWidth={1.5} />
-                <polygon points={`${x2},${cy} ${x2 - ARROW},${cy - 4} ${x2 - ARROW},${cy + 4}`} fill="#d5d9e0" />
-              </g>
-            )
-          })}
-
-          {/* Nodes */}
-          {nodes.map((n, i) => {
-            const col = STATUS_COLORS[n.status]
-            const x = cx(i) - NODE_W / 2
-            const y = cy - NODE_H / 2
-            const isAnim = n.status === 'running'
-            const shownTools = (n.tools ?? []).slice(0, 2)
-            const extraTools = (n.tools?.length ?? 0) - shownTools.length
-
-            return (
-              <g key={n.id}>
-                {isAnim && (
-                  <rect
-                    x={x - 3} y={y - 3} width={NODE_W + 6} height={NODE_H + 6}
-                    rx={9} fill="none" stroke={col.stroke} strokeWidth={2} opacity={0.35}
-                  >
-                    <animate attributeName="opacity" values="0.35;0.7;0.35" dur="1.2s" repeatCount="indefinite" />
-                  </rect>
-                )}
-
-                <rect
-                  x={x} y={y} width={NODE_W} height={NODE_H} rx={7}
-                  fill={col.fill} stroke={col.stroke} strokeWidth={isAnim ? 1.5 : 1}
-                />
-
-                {/* Label */}
-                <text
-                  x={cx(i)} y={y + 20} textAnchor="middle" fontSize={9.5}
-                  fill={col.text} fontFamily="Inter,system-ui,sans-serif" fontWeight="600"
-                >
-                  {n.label.length > 20 ? n.label.slice(0, 20) + '…' : n.label}
-                </text>
-
-                {/* LLM call count */}
-                {!!n.llmCalls && n.llmCalls > 0 && (
-                  <text
-                    x={cx(i)} y={y + 34} textAnchor="middle" fontSize={8}
-                    fill={col.text} opacity={0.7} fontFamily="Inter,system-ui,sans-serif"
-                  >
-                    {n.llmCalls} LLM call{n.llmCalls > 1 ? 's' : ''}
-                  </text>
-                )}
-
-                {/* Status dot */}
-                {n.status !== 'pending' && (
-                  <circle cx={x + NODE_W - 10} cy={y + 10} r={4} fill={col.stroke} />
-                )}
-
-                {/* Tool chips */}
-                {shownTools.map((t, ti) => {
-                  const chipColor = t.error ? '#dc2626' : '#9aa1ac'
-                  return (
-                    <text
-                      key={t.name}
-                      x={cx(i)} y={y + NODE_H + 12 + ti * 11}
-                      textAnchor="middle" fontSize={7.5}
-                      fill={chipColor} fontFamily="Inter,system-ui,sans-serif" fontWeight="600"
-                    >
-                      {t.error ? '⚠ ' : ''}{t.name}
-                    </text>
-                  )
-                })}
-                {extraTools > 0 && (
-                  <text
-                    x={cx(i)} y={y + NODE_H + 12 + shownTools.length * 11}
-                    textAnchor="middle" fontSize={7} fill="#9aa1ac" fontFamily="Inter,system-ui,sans-serif"
-                  >
-                    +{extraTools} more
-                  </text>
-                )}
-              </g>
-            )
-          })}
-        </svg>
-      </div>
+/** Five parallel readers converge on a deterministic decision, then narration. */
+export function WorkflowGraph({ nodes, running }: { nodes: WorkflowNode[]; running?: boolean }) {
+  const positions = nodes.map((_, i) => i === 0 ? [10, 160] : i < 6 ? [190, 16 + (i - 1) * 72] : [390, i === 6 ? 112 : 220])
+  const edges = [[0, 1], [0, 2], [0, 3], [0, 4], [0, 5], [1, 6], [2, 6], [3, 6], [4, 6], [5, 6], [6, 7]]
+  return <div className="rounded-lg border border-surface-3 bg-surface-2 p-3">
+    <div className="flex justify-between text-xs text-ink-muted"><span className="font-semibold">Agent workflow {running ? '· Live' : ''}</span><span>{nodes.filter(n => n.status === 'completed').length}/{nodes.length} complete</span></div>
+    <div className="overflow-x-auto">
+      <svg viewBox="0 0 560 375" className="w-full min-w-[420px]" role="img" aria-label="Supervisor dispatches five parallel agents, then computes a recommendation and writes the narrative">
+        {edges.map(([a, b]) => {
+          const [x, y] = positions[a], [tx, ty] = positions[b]
+          const d = a === 6 ? `M ${x + 75} ${y + 48} V ${ty}` : `M ${x + 150} ${y + 24} C ${x + 175} ${y + 24}, ${tx - 25} ${ty + 24}, ${tx} ${ty + 24}`
+          return <path key={`${a}-${b}`} d={d} fill="none" stroke={nodes[a].status === 'completed' ? colors.completed : '#d5d9e0'} strokeWidth="2" />
+        })}
+        {nodes.map((n, i) => <g key={n.id} transform={`translate(${positions[i].join(',')})`}>
+          <title>{n.label}: {n.status}</title>
+          <rect width="150" height="48" rx="8" fill="white" stroke={colors[n.status]} strokeWidth={n.status === 'running' ? 2 : 1} className={n.status === 'running' ? 'animate-pulse' : ''} />
+          <text x="75" y="20" textAnchor="middle" fill="#1a1a2e" fontSize="12" fontWeight="600">{n.label}</text>
+          <text x="75" y="36" textAnchor="middle" fill={colors[n.status]} fontSize="10">{n.status}</text>
+        </g>)}
+      </svg>
     </div>
-  )
+    <p className="text-xs text-ink-muted">Five specialists read evidence in parallel. Code computes the recommendation; the LLM narrates the findings.</p>
+  </div>
 }

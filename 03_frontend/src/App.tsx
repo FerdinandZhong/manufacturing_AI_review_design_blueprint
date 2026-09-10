@@ -1,3 +1,4 @@
+import { ModelsView } from './components/ModelsView'
 import { useState } from 'react'
 import { StageTracker } from './components/StageTracker'
 import { RequirementsTable } from './components/RequirementsTable'
@@ -12,6 +13,7 @@ import { DecisionControl } from './components/DecisionControl'
 const PROGRAM_ID = 'PACK-ATLAS-01'
 
 export default function App() {
+  const [view, setView] = useState<'cockpit' | 'models'>('cockpit')
   const [reviewId, setReviewId] = useState<string | null>(null)
 
   return (
@@ -30,10 +32,17 @@ export default function App() {
             Agentic NPI lifecycle · Cloudera AI Applied ML Prototype
           </p>
         </div>
+        <nav className="ml-auto flex gap-2" aria-label="Main navigation">
+          {(['cockpit', 'models'] as const).map(tab => <button key={tab} onClick={() => setView(tab)} aria-current={view === tab ? 'page' : undefined}
+            className={`px-4 py-2 rounded-lg text-sm font-semibold text-white ${view === tab ? 'bg-white/20' : 'bg-white/10 hover:bg-white/20'}`}>
+            {tab === 'cockpit' ? 'Program Cockpit' : 'Models'}
+          </button>)}
+        </nav>
       </header>
+      {view === 'models' && <ModelsView />}
 
       {/* ── Body ── */}
-      <div className="flex-1 p-5 space-y-4">
+      <div className={`flex-1 p-5 space-y-4 ${view !== 'cockpit' ? 'hidden' : ''}`}>
         <StageTracker programId={PROGRAM_ID} />
 
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.3fr_1fr] gap-4">

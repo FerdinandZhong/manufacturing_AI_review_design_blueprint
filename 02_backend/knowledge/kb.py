@@ -103,6 +103,8 @@ def build_kb() -> int:
         "program_ref": pa.array([a["program_ref"] for a in assets], type=pa.string()),
         "linked_entity_type": pa.array([a["linked_entity_type"] for a in assets], type=pa.string()),
         "linked_entity_id": pa.array([a["linked_entity_id"] for a in assets], type=pa.string()),
+        **{key: pa.array([a[key] for a in assets], type=pa.string())
+           for key in ("provenance", "source_url", "license_url")},
         "embedding": pa.array([e.tolist() for e in embeddings], type=pa.list_(pa.float32(), dim)),
     })
 

@@ -13,3 +13,12 @@ node_modules/
 dist/
 .DS_Store
 .claude/settings.local.json
+
+# Documentation workspace state and generated presentation exports.
+docs/.claude/
+docs/.omc/
+docs/*.pptx
+
+.cai/
+.omc
+.claude

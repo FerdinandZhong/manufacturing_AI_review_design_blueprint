@@ -4,8 +4,6 @@ import subprocess
 import sys
 import os
 import shutil
-import json
-import urllib.request
 
 try:
     PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -27,20 +25,16 @@ def install_python_deps():
     print("Python dependencies installed.\n")
 
 
-def get_latest_node_lts_major():
-    """Fetch the latest Node.js LTS major version number from the official release API."""
-    try:
-        url = "https://nodejs.org/dist/index.json"
-        with urllib.request.urlopen(url, timeout=15) as resp:
-            releases = json.loads(resp.read().decode())
-        for release in releases:
-            if release.get("lts"):
-                major = release["version"].lstrip("v").split(".")[0]
-                print(f"Latest Node.js LTS: {release['version']} ({release['lts']})")
-                return major
-    except Exception as e:
-        print(f"Warning: could not fetch latest Node.js version ({e}), defaulting to 22.")
-    return "22"
+def node_supported(version):
+    parts = tuple(int(p) for p in version.strip().lstrip("v").split(".")[:3])
+    return parts >= (22, 12, 0)
+
+
+def initialize_config():
+    config = os.path.join(PROJECT_ROOT, "config", "config.yaml")
+    if not os.path.exists(config):
+        shutil.copyfile(config + ".example", config)
+        print("Created config/config.yaml from example")
 
 
 def install_nodejs():
@@ -76,10 +70,15 @@ def install_nodejs():
         except FileNotFoundError:
             node_ver = run_with_nvm("node --version")
             npm_ver = run_with_nvm("npm --version")
-        print(f"Node.js {node_ver} and npm {npm_ver} already installed.")
-        return
+        if node_supported(node_ver):
+            print(f"Node.js {node_ver} and npm {npm_ver} already installed.")
+            if os.path.isfile(nvm_sh) and not shutil.which("node"):
+                node_path = run_with_nvm("command -v node")
+                os.environ["PATH"] = os.path.dirname(node_path) + os.pathsep + os.environ["PATH"]
+            return
+        print(f"Node {node_ver} is too old; installing Node 22 >= 22.12")
 
-    node_major = get_latest_node_lts_major()
+    node_major = "22"
     print(f"Node.js/npm not found. Installing Node.js {node_major}.x via nvm...")
 
     if not os.path.isfile(nvm_sh):
@@ -94,7 +93,10 @@ def install_nodejs():
 
     try:
         run_with_nvm(f"nvm install {node_major}")
+        node_path = run_with_nvm("command -v node")
+        os.environ["PATH"] = os.path.dirname(node_path) + os.pathsep + os.environ["PATH"]
         node_ver = run_with_nvm("node --version")
+        assert node_supported(node_ver), node_ver
         npm_ver = run_with_nvm("npm --version")
         print(f"Node.js {node_ver} and npm {npm_ver} installed via nvm.")
     except Exception as e:
@@ -172,6 +174,7 @@ def main():
     create_directories()
     print()
 
+    initialize_config()
     install_python_deps()
     install_nodejs()
     install_frontend()
@@ -190,4 +193,5 @@ def main():
 
 
 if __name__ == "__main__":
+    assert node_supported("v22.12.0") and not node_supported("v18.20.0")
     main()

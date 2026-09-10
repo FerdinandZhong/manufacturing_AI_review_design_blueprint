@@ -21,6 +21,10 @@ environment_variables:
     default: "caii"
     description: "LLM provider: caii, vllm, or ollama"
     required: false
+  NPI_APP_MODE:
+    default: "prod"
+    description: "Application mode; AMP deployments run the production static frontend"
+    required: false
 
 runtimes:
   - editor: JupyterLab
@@ -73,6 +77,20 @@ tasks:
     memory: 4
     gpu: 0
 
+  - type: run_session
+    name: Verify Prepared Demo
+    script: cai_integration/smoke_test.py
+    kernel: python3
+    short_summary: Verify API, ML, Lance assets, five review workers, and the deterministic gate result
+    long_summary: >-
+      Runs against a temporary SQLite operations database after the source,
+      frontend, model, and Lance assets have been prepared. It verifies the
+      Atlas thermal HIGH-risk / MARGINAL-test / CONDITIONAL-gate storyline
+      without requiring a live LLM or external service.
+    cpu: 2
+    memory: 4
+    gpu: 0
+
   - type: start_application
     name: Vehicle NPI Platform
     subdomain: vehicle-npi-platform
@@ -89,7 +107,12 @@ tasks:
     memory: 8
     gpu: 0
     environment_variables:
-      TASK_TYPE: START_APPLICATION
+      TASK_TYPE:
+        default: START_APPLICATION
+        description: "Marks this AMP task as a Workbench Application launch"
+      NPI_APP_MODE:
+        default: "prod"
+        description: "Serve the prepared production React frontend"
       BACKEND_PORT:
         default: "7078"
-        description: "Localhost port the co-located FastAPI backend binds to"
+        description: "Loopback FastAPI port; distinct from CDSW_APP_PORT"

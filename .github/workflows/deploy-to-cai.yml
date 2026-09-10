@@ -1,0 +1,69 @@
+name: Deploy Vehicle NPI AMP to Cloudera AI
+
+on:
+  workflow_dispatch:
+    inputs:
+      subdomain:
+        description: "Private Application subdomain (a-z0-9-)"
+        required: false
+        default: vehicle-npi-platform
+        type: string
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Check required deployment secrets
+        env:
+          CML_HOST: ${{ secrets.CML_HOST }}
+          CML_API_KEY: ${{ secrets.CML_API_KEY }}
+          RUNTIME_IDENTIFIER: ${{ secrets.RUNTIME_IDENTIFIER }}
+        run: |
+          missing=""
+          for name in CML_HOST CML_API_KEY RUNTIME_IDENTIFIER; do
+            [ -z "${!name}" ] && missing="$missing $name"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::Missing required GitHub Actions secret(s):$missing"
+            exit 1
+          fi
+
+  deploy:
+    needs: preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install deployment client dependencies
+        run: python -m pip install httpx python-dotenv pyyaml
+      - name: Validate AMP manifest before deployment
+        run: python cai_integration/validate_amp.py
+      - name: Create or reuse project, prepare, and deploy private Application
+        env:
+          CML_HOST: ${{ secrets.CML_HOST }}
+          CML_API_KEY: ${{ secrets.CML_API_KEY }}
+          CML_PROJECT_ID: ${{ secrets.CML_PROJECT_ID }}
+          CML_GIT_URL: ${{ secrets.CML_GIT_URL }}
+          RUNTIME_IDENTIFIER: ${{ secrets.RUNTIME_IDENTIFIER }}
+          APP_SUBDOMAIN: ${{ inputs.subdomain || 'vehicle-npi-platform' }}
+          PROJECT_NAME: Vehicle NPI Blueprint
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          export GIT_URL="${CML_GIT_URL:-https://github.com/${GITHUB_REPOSITORY}.git}"
+          python cai_integration/bootstrap.py
+      - name: Publish non-secret deployment result
+        if: always() && hashFiles('.cai/deployment.json') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: cai-deployment-result
+          path: .cai/deployment.json
+          if-no-files-found: ignore
