@@ -20,8 +20,43 @@ import sys
 import os
 import random
 import csv
+from pathlib import Path
 
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+def _find_project_root() -> str:
+    """Locate the repository in scripts and Jupyter/Workbench sessions.
+
+    Python scripts define ``__file__``; notebook cells do not.  In the latter
+    case, search from the Workbench project home (when supplied) and then the
+    current working directory.  A marker check prevents silently writing CSVs
+    into an unrelated directory.
+    """
+    starts = []
+    module_file = globals().get("__file__")
+    if module_file:
+        starts.append(Path(module_file).resolve().parent)
+
+    workbench_home = os.environ.get("CDSW_PROJECT_HOME")
+    if workbench_home:
+        starts.append(Path(workbench_home).expanduser().resolve())
+    starts.append(Path.cwd().resolve())
+
+    seen = set()
+    for start in starts:
+        for candidate in (start, *start.parents):
+            if candidate in seen:
+                continue
+            seen.add(candidate)
+            if (candidate / "02_backend" / "common" / "config.py").is_file():
+                return str(candidate)
+
+    raise RuntimeError(
+        "Could not locate the Vehicle NPI project root. Run this notebook from "
+        "the project directory or set CDSW_PROJECT_HOME to that directory."
+    )
+
+
+PROJECT_ROOT = _find_project_root()
 sys.path.insert(0, os.path.join(PROJECT_ROOT, "02_backend"))
 
 from common.config import get_config, PROJECT_ROOT as CFG_PROJECT_ROOT  # noqa: E402

@@ -24,6 +24,13 @@ def load_file(name, path):
     return module
 
 
+def load_notebook_cell(path):
+    namespace = {'__name__': 'workbench_session'}
+    source = (ROOT / path).read_text()
+    exec(compile(source, '<workbench-session>', 'exec'), namespace)
+    return namespace
+
+
 def test_private_payload_no_deployment_credentials(monkeypatch):
     monkeypatch.setenv('CML_API_KEY', 'never-propagate')
     payload = build_payload('python-runtime')
@@ -40,6 +47,20 @@ def test_private_payload_no_deployment_credentials(monkeypatch):
 def test_amp_manifest_has_ordered_runnable_tasks():
     metadata = validate_amp()
     assert metadata['tasks'][-1]['type'] == 'start_application'
+
+
+@pytest.mark.parametrize(
+    ('path', 'root_name'),
+    [
+        ('02_backend/scripts/prepare.py', 'PROJECT_ROOT'),
+        ('cai_integration/smoke_test.py', 'ROOT'),
+    ],
+)
+def test_amp_session_entrypoints_do_not_require_file(path, root_name, monkeypatch):
+    monkeypatch.delenv('CDSW_PROJECT_HOME', raising=False)
+    monkeypatch.chdir(ROOT)
+    namespace = load_notebook_cell(path)
+    assert Path(namespace[root_name]) == ROOT
 
 
 def test_host_and_git_validation():

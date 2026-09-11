@@ -2,7 +2,16 @@
 import os
 import sys
 from pathlib import Path
-ROOT = Path(__file__).resolve().parents[1]
+
+if '__file__' in globals():
+    ROOT = Path(__file__).resolve().parents[1]
+else:
+    ROOT = Path(os.environ.get('CDSW_PROJECT_HOME', os.getcwd())).resolve()
+    if not (ROOT / '02_backend' / 'common' / 'config.py').is_file():
+        raise RuntimeError(
+            'Could not locate the Vehicle NPI project root. Run this task from '
+            'the project directory or set CDSW_PROJECT_HOME to that directory.'
+        )
 sys.path.insert(0, str(ROOT / '02_backend'))
 
 import tempfile

@@ -7,10 +7,19 @@ overwrite their artifacts).
 import sys
 import os
 from collections import Counter
+from pathlib import Path
 
 # scripts/ is one level under 02_backend/, same depth as engineering/ml/knowledge
 # -> one level up from this file reaches 02_backend.
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if "__file__" in globals():
+    PROJECT_ROOT = str(Path(__file__).resolve().parents[2])
+else:
+    PROJECT_ROOT = os.environ.get("CDSW_PROJECT_HOME", os.getcwd())
+    if not (Path(PROJECT_ROOT) / "02_backend" / "common" / "config.py").is_file():
+        raise RuntimeError(
+            "Could not locate the Vehicle NPI project root. Run this task from "
+            "the project directory or set CDSW_PROJECT_HOME to that directory."
+        )
 sys.path.insert(0, os.path.join(PROJECT_ROOT, "02_backend"))
 
 from common import source
