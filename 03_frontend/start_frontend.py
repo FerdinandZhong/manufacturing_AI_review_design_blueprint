@@ -150,8 +150,49 @@ def create_app(backend_port):
     return app
 
 
-def main():
+def _run_uvicorn(app, host, port):
+    """Run Uvicorn from a process or from a notebook with an active event loop.
+
+    ``uvicorn.run`` owns the asyncio loop and therefore raises when called from
+    a Jupyter/CML notebook cell whose loop is already running. In that case the
+    server gets its own loop in a dedicated thread; normal CLI launches retain
+    Uvicorn's standard foreground behavior.
+    """
+    import asyncio
+    import threading
     import uvicorn
+
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        uvicorn.run(app, host=host, port=port)
+        return
+
+    config = uvicorn.Config(app, host=host, port=port)
+    server = uvicorn.Server(config)
+    failures = []
+
+    def serve():
+        try:
+            server.run()
+        except BaseException as exc:  # propagate startup failures to the caller
+            failures.append(exc)
+
+    thread = threading.Thread(target=serve, name='npi-uvicorn', daemon=False)
+    thread.start()
+    try:
+        thread.join()
+    except KeyboardInterrupt:
+        server.should_exit = True
+        thread.join(timeout=10)
+        if thread.is_alive():
+            server.force_exit = True
+            thread.join()
+    if failures:
+        raise failures[0]
+
+
+def main():
     mode = os.getenv('NPI_APP_MODE') or (sys.argv[1] if len(sys.argv) > 1 else 'prod')
     port = _env_int('CDSW_APP_PORT', 'FRONTEND_PORT', default=8100)
     backend = _env_int('BACKEND_PORT', default=7078)
@@ -165,7 +206,7 @@ def main():
             _stop_backend()
     else:
         check_artifacts()
-        uvicorn.run(create_app(backend), host=_bind_host(), port=port)
+        _run_uvicorn(create_app(backend), host=_bind_host(), port=port)
 
 
 if __name__ == '__main__':
