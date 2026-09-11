@@ -5,6 +5,7 @@ An AMP-ready prototype for EV battery-pack New Product Introduction (NPI) gate r
 ## Table of Contents
 
 - [Overview](#overview)
+- [Program Cockpit](#program-cockpit)
 - [Demo](#demo)
 - [Use Case](#use-case)
 - [Key Features](#key-features)
@@ -19,6 +20,20 @@ An AMP-ready prototype for EV battery-pack New Product Introduction (NPI) gate r
 ## Overview
 
 Vehicle NPI Gate Review helps manufacturing engineering teams decide whether a new battery-pack design can move through a release gate. The prototype runs on Cloudera AI Workbench as a private application. It brings requirements, designs, DVP&R test results, ML risk signals, and historical technical assets into one cockpit, while preserving the core rule: **code decides, LLM narrates**. The system computes every score, verdict, and recommendation deterministically; agentic AI assembles evidence and explains it for a human decision.
+
+## Program Cockpit
+
+The cockpit is the demo's evidence-to-decision surface. The screenshot below shows the Atlas Battery Pack review in its pending gate state:
+
+![Vehicle NPI Program Cockpit showing requirements, traceability, risk, agent workflow, and knowledge-base evidence](docs/assets/program-cockpit-gate-review.png)
+
+The three-column layout follows the reviewer's path through the evidence:
+
+- **Requirements and design risk** — approved requirements sit beside the feature-based risk panel, with the thermal requirement surfaced as **HIGH**.
+- **Traceability and gate review** — requirement-to-test coverage, verdicts, the five-worker workflow, and the deterministic **CONDITIONAL** recommendation are visible together.
+- **Knowledge base** — historical design images, test reports, and requirement excerpts provide cited context for the human reviewer.
+
+The application keeps the decision boundary visible: the engineering and ML computations produce the facts, agents gather and narrate evidence, and a human decides whether to release, condition, or hold the program.
 
 ## Demo
 
