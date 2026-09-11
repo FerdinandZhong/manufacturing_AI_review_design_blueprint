@@ -1,0 +1,46 @@
+# Project-level deployment contract for operators and local automation.
+#
+# Cloudera AI AMP import reads .project-metadata.yaml.  This companion keeps
+# the project identity, preparation sequence, and Application configuration
+# in one short, reviewable file; cai_integration/validate_amp.py checks that
+# it agrees with the AMP manifest before a deployment.
+api_version: "vehicle-npi.cloudera.ai/v1"
+kind: "ClouderaAIProject"
+
+metadata:
+  name: "Vehicle NPI Blueprint"
+  slug: "vehicle-npi-gate-review"
+  description: >-
+    Auditable EV battery-pack NPI gate reviews using deterministic engineering
+    checks, traditional ML, multimodal knowledge retrieval, and agentic
+    evidence narration on Cloudera AI.
+  amp_manifest: ".project-metadata.yaml"
+
+spec:
+  runtime:
+    editor: "JupyterLab"
+    kernel: "Python 3.11"
+    edition: "Standard"
+
+  preparation:
+    - "01_installer/install.py"
+    - "02_backend/data_generation/generate_synthetic_data.py"
+    - "02_backend/scripts/prepare.py"
+    - "cai_integration/smoke_test.py"
+
+  application:
+    name: "Vehicle NPI Platform"
+    script: "03_frontend/start_frontend.py"
+    subdomain: "vehicle-npi-platform"
+    cpu: 2
+    memory_gb: 8
+    gpu: 0
+    environment:
+      BACKEND_PORT: "7078"
+      NPI_APP_MODE: "prod"
+      LLM_PROVIDER: "caii"
+
+  storage:
+    source: "data/raw (read-only CSV)"
+    operations: "data/npi.db (SQLite)"
+    knowledge_base: "data/kb/assets.lance (Lance)"

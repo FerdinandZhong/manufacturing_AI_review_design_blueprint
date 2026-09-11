@@ -1,6 +1,6 @@
 # Cloudera Blueprint: Vehicle NPI Gate Review
 
-An AMP-ready prototype for EV battery-pack New Product Introduction (NPI) gate reviews. It demonstrates how a solution on Cloudera AI can combine engineering data queries, a Lance-backed multimodal knowledge base, traditional ML, and agentic AI into an auditable report for a human approver.
+An AMP-ready prototype for EV battery-pack New Product Introduction (NPI) gate reviews. It shows a concrete Cloudera AI pattern: query engineering data, retrieve multimodal knowledge, apply traditional ML, and use agents to assemble an auditable report for a human approver.
 
 ## Table of Contents
 
@@ -10,6 +10,7 @@ An AMP-ready prototype for EV battery-pack New Product Introduction (NPI) gate r
 - [Use Case](#use-case)
 - [Key Features](#key-features)
 - [Quickstart / Guide](#quickstart--guide)
+- [Deploy in Cloudera AI Workbench](#deploy-in-cloudera-ai-workbench)
 - [Architecture / Software Components](#architecture--software-components)
 - [Target Audience](#target-audience)
 - [Repository Structure](#repository-structure)
@@ -70,9 +71,13 @@ Open the URL printed by `start_app.py` (normally `http://localhost:8100`). Run t
 
 No live LLM is required. When no configured provider is available, the workers and narrative use deterministic templates. Set `config/config.yaml` to use CAII, vLLM, or Ollama for narration; the LLM still cannot change computed outcomes.
 
-### Cloudera AI AMP
+## Deploy in Cloudera AI Workbench
 
-Import the repository through the AMP catalog. Run the declared tasks in order:
+Choose one of two deployment paths: launch the AMP from the Cloudera AI catalog, which creates the project and runs its declared tasks, or create a project from this repository and run the same preparation sequence as Jobs. The deployment expects a Python 3.11 Standard runtime and persistent project storage; it needs no GPU and no LLM credential for the deterministic demo.
+
+Cloudera AI imports the standard AMP contract from [`.project-metadata.yaml`](.project-metadata.yaml). [`project.yaml`](project.yaml) is the companion project contract used by the repository validator and deployment documentation; it records the matching runtime, preparation sequence, Application, and storage layout.
+
+Run the declared tasks in order:
 
 1. **Install Dependencies**
 2. **Generate Synthetic Data**
@@ -81,6 +86,18 @@ Import the repository through the AMP catalog. Run the declared tasks in order:
 5. **Vehicle NPI Platform**
 
 The final task starts a private, SSO-protected application. Workbench assigns `CDSW_APP_PORT`; the application serves the frontend and proxies `/api` to a loopback FastAPI process.
+
+For a manual application setup after preparation, use these settings:
+
+| Setting | Value |
+| --- | --- |
+| Script | `03_frontend/start_frontend.py` |
+| Resources | 2 vCPU, 8 GB RAM, no GPU |
+| Runtime | Python 3.11 Standard |
+| Environment | `BACKEND_PORT=7078`, `NPI_APP_MODE=prod`; optionally `LLM_PROVIDER=caii` |
+| Access | Keep unauthenticated access disabled; Workbench SSO protects the cockpit |
+
+Do not define `CDSW_APP_PORT`; Workbench supplies it. Open the generated Application link, choose `PACK-ATLAS-01`, and run the review. The expected demonstration result is thermal **HIGH** risk, a **MARGINAL** thermal test, and a **CONDITIONAL** recommendation for human action.
 
 ### Automated deployment
 
@@ -125,6 +142,7 @@ The traditional ML model uses historical requirement and design features to prod
 | `data/` | Generated CSV source, SQLite operations data, and Lance KB artifacts. |
 | `docs/` | Architecture, component contracts, development guide, user guide, and demo stories. |
 | `.project-metadata.yaml` | CAI AMP task manifest. |
+| `project.yaml` | Operator-facing project contract, validated against the AMP manifest. |
 | `METADATA.yaml` | Blueprint catalog metadata. |
 
 ## Prerequisites

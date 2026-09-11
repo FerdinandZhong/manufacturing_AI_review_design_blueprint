@@ -25,3 +25,4 @@ artifacts/deck_review/
 .claude
 
 **/*.egg-info/
+.omc
