@@ -47,6 +47,14 @@ Pause for effect.
 
 > "The ML model predicted HIGH risk. The actual test came back MARGINAL. Two entirely separate computations — one predictive, one measured — agree. That's the corroboration story."
 
+**Make the two signals explicit (use when the audience asks how they relate).**
+
+> "For this prototype, the DVP&R result is a deterministic simulation of a lab result. The test bench takes the seeded measured value — 103 degC for Atlas thermal — and compares it with the 100 degC target. That gives a +3% margin. Our engineering rule calls margins from zero up to, but not including, 10% MARGINAL. This is the factual test signal in the demo; in production, the same interface would read an actual lab or validation-system result."
+
+> "The ML model does not receive the test verdict as an input. It predicts risk from the requirement, design, BOM, and supplier feature vector: target value, design value, margin, cost, mass, supplier quality, and thermal and safety flags. It was trained only on the historical Orion and Vega programs, where the thermal requirements failed. Atlas is held out as the demo program, so its HIGH score is a prediction rather than a replay of its own test outcome."
+
+> "That separation matters. The model provides an early-warning signal; the test bench computes the validation fact. The gate function then reads the deterministic evidence, including coverage and standards, to recommend CONDITIONAL. The LLM explains the result but cannot change any of those values."
+
 Point at the cost row (amber highlight):
 
 > "There's also a coverage gap — the cost requirement has a design spec but no test plan. Four of five requirements have test coverage; cost does not."
