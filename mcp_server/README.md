@@ -53,23 +53,42 @@ recommendations are computed by the application. The only mutating tool is
 `trigger_gate_review`, which creates a review and evidence record; it cannot
 approve/reject a gate or change model configuration.
 
-Install locally or with a revision-pinned `uvx` source after the repository
-revision is published:
+Install locally or use the following `uvx` source from the published `main` branch.
+The package lives in `mcp_server`, so keep the `#subdirectory=mcp_server` suffix.
 
 ```json
 {
   "mcpServers": {
     "vehicle-npi": {
       "command": "uvx",
-      "args": ["--from", "git+https://github.com/FerdinandZhong/manufacturing_AI_review_design_blueprint.git@COMMIT#subdirectory=mcp_server", "npi-mcp"],
+      "args": ["--from", "git+https://github.com/FerdinandZhong/manufacturing_AI_review_design_blueprint.git@main#subdirectory=mcp_server", "npi-mcp"],
       "env": {
-        "NPI_API_BASE_URL": "https://vehicle-npi-platform.<workspace-domain>/api",
-        "NPI_API_TOKEN": "OPTIONAL_APPLICATION_TOKEN"
+        "NPI_API_BASE_URL": "https://vehicle-npi-platform-h4ipg8.ml-c5697ef8-0c9.qzhong-a.a465-9q4k.cloudera.site/api"
       }
     }
   }
 }
 ```
+
+For Agent Studio fields, select stdio transport, use `uvx` as the command,
+and supply the three `args` entries above as separate arguments. If the host
+uses `uv run --with` instead, the same Git URL is the requirement and
+`npi-mcp` is the executable. Use Python 3.11 or later.
+
+Push changes to `origin/main` before restarting the MCP server. The dependency
+tracks that branch, so no commit hash needs updating in Agent Studio. If uv
+reuses a cached revision after a push, add `--refresh` before `--from` for the
+next launch to force dependency revalidation.
+
+An error such as `Updating ... (COMMIT)` followed by `Failed to resolve
+--with requirement` means Git is trying to fetch the literal revision
+`COMMIT`. Replace the entire dependency URL with the `@main` URL above; retrying
+the unchanged configuration cannot fix that missing revision. A Git install
+failure happens before MCP initialization or any application API request.
+
+The configured application URL is this demo deployment; change it when using
+another deployment. Omit `NPI_API_TOKEN` unless you have a supported application
+token; never send the literal placeholder `OPTIONAL_APPLICATION_TOKEN`.
 
 The client must be able to launch stdio processes and authenticate to the
 private Workbench Application. `NPI_API_TOKEN` is only used when the deployed
