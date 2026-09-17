@@ -8,8 +8,12 @@ URL ending in `/api`. The sandbox only needs this package and HTTP access;
 it does not need the engineering data files or backend Python dependencies.
 Localhost works only if the API and MCP process share a network namespace.
 For a separate CAI Studio/agent workload, use the reachable Workbench Application
-URL and its supported machine authentication mechanism. SSO redirects produce
-an explicit error; an optional bearer header cannot bypass the Workbench ingress.
+URL and its supported machine authentication mechanism. Configure the required
+application bearer token as `NPI_API_BEARER_TOKEN`; the adapter sends it on every
+application request as `Authorization: Bearer <token>`. The current deployment
+redirects unauthenticated requests to Workbench SSO. A bearer token cannot bypass
+an unsupported Workbench ingress path, so the Agent Studio runtime must have the
+supported machine-access route as well as the token.
 
 | Tool | Purpose |
 | --- | --- |
@@ -63,7 +67,8 @@ The package lives in `mcp_server`, so keep the `#subdirectory=mcp_server` suffix
       "command": "uvx",
       "args": ["--from", "git+https://github.com/FerdinandZhong/manufacturing_AI_review_design_blueprint.git@main#subdirectory=mcp_server", "npi-mcp"],
       "env": {
-        "NPI_API_BASE_URL": "https://vehicle-npi-platform-h4ipg8.ml-c5697ef8-0c9.qzhong-a.a465-9q4k.cloudera.site/api"
+        "NPI_API_BASE_URL": "https://vehicle-npi-platform-h4ipg8.ml-c5697ef8-0c9.qzhong-a.a465-9q4k.cloudera.site/api",
+        "NPI_API_BEARER_TOKEN": "<application-bearer-token>"
       }
     }
   }
@@ -87,11 +92,14 @@ the unchanged configuration cannot fix that missing revision. A Git install
 failure happens before MCP initialization or any application API request.
 
 The configured application URL is this demo deployment; change it when using
-another deployment. Omit `NPI_API_TOKEN` unless you have a supported application
-token; never send the literal placeholder `OPTIONAL_APPLICATION_TOKEN`.
+another deployment. Set `NPI_API_BEARER_TOKEN` to the application bearer token.
+`NPI_API_TOKEN` remains a backwards-compatible alias. Either may contain a raw
+token or `Bearer <token>`; the adapter always emits exactly one Bearer prefix.
+Never use the CAI API-v2 deployment key or send a literal placeholder.
 
 The client must be able to launch stdio processes and authenticate to the
-private Workbench Application. `NPI_API_TOKEN` is only used when the deployed
-application explicitly supports it; it is not a substitute for Workbench SSO
-and is never the API v2 deployment key. Tool errors intentionally omit tokens
-and upstream response bodies.
+private Workbench Application. `NPI_API_BEARER_TOKEN` is sent only to the
+configured application origin; it is not a substitute for Workbench SSO and is
+never the API v2 deployment key. Tool errors intentionally omit tokens and
+upstream response bodies. HTTP 401/403 errors explicitly distinguish a missing
+token from a rejected one without exposing the token value.

@@ -11,9 +11,12 @@ from npi_mcp import server
 
 def test_base_url_and_token(monkeypatch):
     monkeypatch.setenv("NPI_API_BASE_URL", "https://npi.example.com/api/")
-    monkeypatch.setenv("NPI_API_TOKEN", "token-value")
+    monkeypatch.setenv("NPI_API_BEARER_TOKEN", "Bearer token-value")
     assert server._base_url() == "https://npi.example.com/api"
     assert server._headers() == {"Authorization": "Bearer token-value"}
+    monkeypatch.delenv("NPI_API_BEARER_TOKEN")
+    monkeypatch.setenv("NPI_API_TOKEN", "legacy-token")
+    assert server._headers() == {"Authorization": "Bearer legacy-token"}
     monkeypatch.setenv("NPI_API_BASE_URL", "https://npi.example.com/not-api")
     with pytest.raises(RuntimeError, match="end with /api"):
         server._base_url()
@@ -48,6 +51,22 @@ def test_request_rejects_redirect_and_non_json(monkeypatch):
     monkeypatch.setattr(server.httpx, "Client", FakeClient)
     with pytest.raises(RuntimeError, match="redirected"):
         server._request("GET", "/programs")
+
+
+def test_request_redacts_bearer_authentication_errors(monkeypatch):
+    monkeypatch.setenv("NPI_API_BASE_URL", "https://npi.example.com/api")
+    monkeypatch.setenv("NPI_API_BEARER_TOKEN", "secret-value")
+
+    class FakeClient:
+        def __init__(self, **kwargs): pass
+        def __enter__(self): return self
+        def __exit__(self, *args): return False
+        def request(self, *args, **kwargs): return httpx.Response(401, json={"detail": "no"})
+
+    monkeypatch.setattr(server.httpx, "Client", FakeClient)
+    with pytest.raises(RuntimeError, match="bearer authentication.*was rejected") as error:
+        server._request("GET", "/programs")
+    assert "secret-value" not in str(error.value)
 
 
 def test_program_path_encodes_input():

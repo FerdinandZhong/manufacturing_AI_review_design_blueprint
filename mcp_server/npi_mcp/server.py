@@ -27,8 +27,20 @@ def _base_url() -> str:
 
 
 def _headers() -> dict[str, str]:
-    token = os.environ.get("NPI_API_TOKEN", "").strip()
-    return {"Authorization": f"Bearer {token}"} if token else {}
+    """Return the application bearer header without ever logging its token.
+
+    ``NPI_API_BEARER_TOKEN`` is the explicit configuration name.  The original
+    ``NPI_API_TOKEN`` remains a compatibility alias for existing clients.
+    Either value may be supplied as a raw token or as ``Bearer <token>``.
+    """
+    token = (os.environ.get("NPI_API_BEARER_TOKEN") or os.environ.get("NPI_API_TOKEN") or "").strip()
+    if token.lower().startswith("bearer "):
+        token = token[7:].strip()
+    if not token:
+        return {}
+    if any(character.isspace() for character in token):
+        raise RuntimeError("NPI bearer token must not contain whitespace")
+    return {"Authorization": f"Bearer {token}"}
 
 
 def _request(method: str, path: str, *, params: dict | None = None, payload: dict | None = None) -> dict | list:
@@ -40,7 +52,17 @@ def _request(method: str, path: str, *, params: dict | None = None, payload: dic
     except httpx.HTTPError as exc:
         raise RuntimeError("NPI API is unavailable") from None
     if 300 <= response.status_code < 400:
-        raise RuntimeError("NPI API redirected the request; configure the authenticated Application URL")
+        raise RuntimeError(
+            "NPI API redirected the request to Workbench SSO; configure a supported "
+            "machine-authenticated Application URL"
+        )
+    if response.status_code in {401, 403}:
+        configured = bool(_headers())
+        detail = "was rejected" if configured else "is not configured"
+        raise RuntimeError(
+            f"NPI API requires bearer authentication (HTTP {response.status_code}); "
+            f"NPI_API_BEARER_TOKEN {detail}"
+        )
     if not 200 <= response.status_code < 300:
         raise RuntimeError(f"NPI API returned HTTP {response.status_code}")
     try:
