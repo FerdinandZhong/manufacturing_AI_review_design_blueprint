@@ -103,3 +103,19 @@ Local development uses Demo mode on loopback. Workbench requires production prox
 ## Knowledge v3
 
 See [knowledge-v3.md](knowledge-v3.md) for the pinned embedding contract, build-time extraction, scoped retrieval, conservative narration, and explicit OCR command. Normal preparation and runtime never initiate paid OCR.
+
+
+## Workbench NumPy / PyArrow import repair
+
+Step 3 previously allowed NumPy 1.26.4 to remain installed while pip selected a newer PyArrow wheel requiring NumPy 2. The numerical stack is now pinned together in requirements.txt. The installer upgrades these packages and checks binary imports plus a NumPy → pandas → Arrow → Lance round trip in a new Python process. CI starts with NumPy 1.26.4 to exercise this upgrade path.
+
+For an existing failed Workbench project, update to the latest source and run this in a session or notebook:
+
+```python
+import subprocess, sys
+subprocess.check_call([sys.executable, "-m", "pip", "install", "--upgrade", "-r", "requirements.txt"])
+```
+
+Stop that Workbench session and start a new session before rerunning Step 3 (`02_backend/scripts/prepare.py`). Notebook cells can retain the old NumPy binary after pip installs a replacement. Repeating the import in the same kernel does not reload the binary stack. Rerun preparation to rebuild the model and knowledge artifacts with the pinned versions.
+
+Reference: [Apache Arrow installation requirements](https://arrow.apache.org/docs/python/install.html).

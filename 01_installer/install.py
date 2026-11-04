@@ -20,9 +20,41 @@ def install_python_deps():
     print("Installing Python dependencies...")
     print("=" * 50)
     subprocess.check_call(
-        [sys.executable, "-m", "pip", "install", "-r", req_file],
+        [sys.executable, "-m", "pip", "install", "--upgrade", "-r", req_file],
     )
+    verify_python_deps()
     print("Python dependencies installed.\n")
+
+
+def verify_python_deps():
+    """Check compiled imports and NumPy/Arrow/Lance interop in a fresh process."""
+    code = '''
+import tempfile
+from pathlib import Path
+from importlib.metadata import version
+import numpy as np
+import pandas as pd
+import pyarrow as pa
+import lance
+import scipy
+import sklearn
+with tempfile.TemporaryDirectory(prefix='npi-dependency-check-') as tmp:
+    frame = pd.DataFrame({'value': np.array([1., 2.], dtype=np.float64)})
+    table = pa.Table.from_pandas(frame, preserve_index=False)
+    dataset = lance.write_dataset(table, str(Path(tmp) / 'probe.lance'))
+    assert dataset.to_table().column('value').to_pylist() == [1., 2.]
+print('Binary dependency check passed: ' + ', '.join(name + '=' + version(name)
+      for name in ('numpy', 'pandas', 'scipy', 'scikit-learn', 'pyarrow', 'pylance')))
+'''
+    try:
+        subprocess.check_call([sys.executable, '-c', code])
+    except subprocess.CalledProcessError as exc:
+        raise RuntimeError(
+            'Python binary dependencies are incompatible. Reinstall requirements.txt '
+            'with --upgrade, then start a fresh Workbench session before preparation.'
+        ) from exc
+    if 'numpy' in sys.modules or 'pyarrow' in sys.modules:
+        print('Start a fresh Workbench session before Step 3; this kernel may retain old binary modules.')
 
 
 def node_supported(version):
