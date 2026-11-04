@@ -28,8 +28,6 @@ jobs:
         run: |
           python 02_backend/data_generation/generate_synthetic_data.py
           python 02_backend/scripts/prepare.py
-      - name: Run backend and MCP tests
-        run: python -m pytest 02_backend/tests mcp_server/tests -q
       - uses: actions/setup-node@v4
         with:
           node-version: "22.12.0"
@@ -41,5 +39,7 @@ jobs:
           npm ci
           npm run build
           npm run lint
+      - name: Run backend and MCP tests
+        run: python -m pytest 02_backend/tests mcp_server/tests -q
       - name: Verify prepared application
         run: python cai_integration/smoke_test.py
