@@ -24,6 +24,10 @@ jobs:
           python -c "from importlib.metadata import version; v = version('mcp'); assert int(v.split('.')[0]) == 1, v; print('mcp', v)"
       - name: Validate AMP metadata
         run: python cai_integration/validate_amp.py
+      - name: Prepare deterministic demo fixtures
+        run: |
+          python 02_backend/data_generation/generate_synthetic_data.py
+          python 02_backend/scripts/prepare.py
       - name: Run backend and MCP tests
         run: python -m pytest 02_backend/tests mcp_server/tests -q
       - uses: actions/setup-node@v4
@@ -37,3 +41,5 @@ jobs:
           npm ci
           npm run build
           npm run lint
+      - name: Verify prepared application
+        run: python cai_integration/smoke_test.py

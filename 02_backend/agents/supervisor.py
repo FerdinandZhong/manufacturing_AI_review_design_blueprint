@@ -27,6 +27,7 @@ import json
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.join(PROJECT_ROOT, "02_backend"))
 
+from common import source
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Generator
 
@@ -55,6 +56,11 @@ _WORKERS = [
 
 
 def run_gate_review(review_id: str, program_id: str) -> Generator[dict, None, None]:
+    from common.runtime import require_demo
+    require_demo('Pilot review execution pending approved domain rules')
+    from engineering.metrics import summary
+    if not summary(program_id)['prepared']:
+        raise ValueError('Snapshot results are missing or stale. Run prepare.py before reviewing.')
     # The plan's showcase program is pre-seeded through VALIDATION; this call
     # exercises the final GATE_REVIEW -> RELEASED leg of the state machine.
     state = transition(ProgramState.VALIDATION, ProgramState.GATE_REVIEW)
@@ -69,7 +75,19 @@ def run_gate_review(review_id: str, program_id: str) -> Generator[dict, None, No
             (review_id, program_id, state.value),
         )
 
-    yield _e("phase", phase="COLLECTING")
+    identity = source.snapshot_identity(program_id)
+    with get_connection() as conn:
+        stored = conn.execute('SELECT * FROM gate_reviews WHERE review_id=?', (review_id,)).fetchone()
+        if stored['program_id'] != program_id:
+            raise ValueError('Review belongs to a different program snapshot')
+        if stored['recommendation']:
+            yield _e('recommendation', value=stored['recommendation'])
+            yield _e('token', text=stored['narrative'] or '')
+            yield _e('done')
+            return
+        conn.execute('UPDATE gate_reviews SET snapshot_id=?, revision_id=?, canonical_program_id=? WHERE review_id=?',
+                     (identity['snapshot_id'], identity['revision_id'], identity['program_id'], review_id))
+    yield _e("phase", phase="COLLECTING", **identity)
     findings_list = []
     with ThreadPoolExecutor(max_workers=5) as ex:
         futures = {}
@@ -87,7 +105,7 @@ def run_gate_review(review_id: str, program_id: str) -> Generator[dict, None, No
     # the SSE event sequence (beyond timing) is stable across runs.
     findings_list.sort(key=lambda r: r["worker"])
     for result in findings_list:
-        yield _e("worker_done", worker=result["worker"], findings=result["findings"], evidence_ids=result["evidence_ids"])
+        yield _e("worker_done", worker=result["worker"], findings=result["findings"], evidence_ids=result["evidence_ids"], **({'assessment':result['assessment']} if 'assessment' in result else {}))
 
     # Code decides: pure function over already-deterministic data — never
     # influenced by any worker's LLM-generated prose.
@@ -99,7 +117,9 @@ def run_gate_review(review_id: str, program_id: str) -> Generator[dict, None, No
 
     yield _e("phase", phase="ANALYZING")
     narrative_chunks = []
-    for tok in narrate(program_id, findings_list, rec):
+    narrative_context = {'coverage':cov, 'results':test_results, 'missing_standards':missing_std,
+                         'issues':(source.get_snapshot(program_id) or {}).get('issues',[])}
+    for tok in narrate(program_id, findings_list, rec, context=narrative_context):
         narrative_chunks.append(tok)
         yield _e("token", text=tok)
     narrative_text = "".join(narrative_chunks)

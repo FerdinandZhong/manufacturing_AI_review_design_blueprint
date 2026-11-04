@@ -24,59 +24,47 @@ from common.db import get_connection
 FEATURES = ["target_value", "spec_value", "margin", "bom_cost", "bom_mass",
             "supplier_quality", "is_thermal", "is_safety"]
 
-_suppliers_cache: dict[str, float] | None = None
-
-
 def _supplier_quality() -> dict[str, float]:
-    """supplier_id -> quality_rating, read directly from suppliers.csv.
-
-    common/source.py has no list_suppliers() accessor (not in Task 2's pinned
-    interfaces), so this reads the reference CSV directly — still read-only,
-    still fine under the two-store rule.
-    """
-    global _suppliers_cache
-    if _suppliers_cache is None:
-        path = os.path.join(PROJECT_ROOT, "data", "raw", "suppliers.csv")
-        df = pd.read_csv(path)
-        _suppliers_cache = dict(zip(df["supplier_id"], df["quality_rating"]))
-    return _suppliers_cache
+    """Read supplier quality through the shared reference-source contract."""
+    return {row['supplier_id']:float(row['quality_rating']) for row in source.list_suppliers()}
 
 
-def build_features(programs: list[str]) -> pd.DataFrame:
-    """One row per requirement (that has a test result), with the 8 features + label."""
+def build_features(programs: list[str], require_labels: bool = True) -> pd.DataFrame:
+    """Aggregate all linked designs and BOM rows; require observed labels only for training."""
     suppliers = _supplier_quality()
     rows = []
     conn = get_connection()
     try:
         for pid in programs:
-            specs = {s["req_id"]: s for s in source.list_design_specs(pid)}
-            boms = {b["spec_id"]: b for b in source.list_bom(pid)}
-            test_plans = {t["req_id"]: t for t in source.list_test_plans(pid)}
+            specs = source.list_design_specs(pid)
+            boms = source.list_bom(pid)
+            test_plans = source.list_test_plans(pid)
             verdicts = {row["test_id"]: row["verdict"] for row in conn.execute(
-                "SELECT test_id, verdict FROM test_results WHERE program_id=?", (pid,))}
+                "SELECT test_id, verdict FROM test_results WHERE program_id=? AND snapshot_id=?", (pid,source.snapshot_identity(pid)["snapshot_id"]))}
             for r in source.list_requirements(pid):
                 req_id = r["req_id"]
-                tp = test_plans.get(req_id)
-                if tp is None:
-                    continue  # no test plan -> can't label, exclude
-                verdict = verdicts.get(tp["test_id"])
-                if verdict is None:
-                    continue  # not run through the test bench yet -> exclude
-                spec = specs.get(req_id)
-                bom = boms.get(spec["spec_id"]) if spec else None
+                linked_tests = [t for t in test_plans if t["req_id"] == req_id]
+                labels = [verdicts[t["test_id"]] for t in linked_tests if t["test_id"] in verdicts]
+                if require_labels and not labels:
+                    continue
+                verdict = "FAIL" if "FAIL" in labels else "MARGINAL" if "MARGINAL" in labels else "PASS" if labels else None
+                linked_specs = [v for v in specs if v["req_id"] == req_id]
+                linked_boms = [b for b in boms if b["spec_id"] in {v["spec_id"] for v in linked_specs}]
                 target_value = float(r["target_value"])
-                spec_value = float(spec["value"]) if spec else 0.0
+                direction = r.get("acceptance_direction", "higher")
+                spec_value = (min if direction == "higher" else max)(float(v["value"]) for v in linked_specs) if linked_specs else 0.0
                 margin = (spec_value - target_value) / target_value if target_value != 0 else 0.0
-                bom_cost = float(bom["unit_cost"]) if bom else 0.0
-                bom_mass = float(bom["mass_kg"]) if bom else 0.0
-                supplier_quality = float(suppliers.get(bom["supplier_id"], 0.0)) if bom else 0.0
+                margin *= 1 if direction == "higher" else -1
+                bom_cost = sum(float(b["unit_cost"])*float(b["qty"]) for b in linked_boms)
+                bom_mass = sum(float(b["mass_kg"])*float(b["qty"]) for b in linked_boms)
+                supplier_quality = min((float(suppliers.get(b["supplier_id"], 0.0)) for b in linked_boms), default=0.0)
                 rows.append({
                     "program_id": pid, "req_id": req_id,
                     "target_value": target_value, "spec_value": spec_value, "margin": margin,
                     "bom_cost": bom_cost, "bom_mass": bom_mass, "supplier_quality": supplier_quality,
                     "is_thermal": 1 if r["category"] == "thermal" else 0,
                     "is_safety": 1 if r["category"] == "safety" else 0,
-                    "label": 1 if verdict in ("FAIL", "MARGINAL") else 0,
+                    "label": 1 if verdict in ("FAIL", "MARGINAL") else 0 if verdict else None,
                 })
     finally:
         conn.close()
@@ -98,6 +86,8 @@ def train() -> str:
 
     Returns the model_version string.
     """
+    from common.runtime import require_demo
+    require_demo('Synthetic model training')
     df = build_features(_historical_programs())
     X = df[FEATURES].to_numpy()
     y = df["label"].to_numpy()
@@ -105,7 +95,7 @@ def train() -> str:
     model.fit(X, y)
 
     model_version = "rm-" + hashlib.sha256(
-        df[FEATURES].to_csv(index=False).encode()).hexdigest()[:10]
+        df[["program_id", "req_id"] + FEATURES + ["label"]].to_csv(index=False).encode()).hexdigest()[:10]
 
     model_dir = _model_dir()
     os.makedirs(model_dir, exist_ok=True)
@@ -120,6 +110,11 @@ def train() -> str:
 if __name__ == "__main__":
     from common.db import init_db
     from engineering.test_bench import run_test_bench
+    import tempfile
+    import common.db as db
+    _tmp = tempfile.mkdtemp()
+    db.get_db_path = lambda: os.path.join(_tmp, 'train.db')
+    get_config().setdefault('ml', {})['model_dir'] = os.path.join(_tmp, 'models')
     init_db()
     for _p in _historical_programs():
         run_test_bench(_p)

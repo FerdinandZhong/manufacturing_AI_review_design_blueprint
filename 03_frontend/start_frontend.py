@@ -11,6 +11,7 @@ FRONTEND_DIR = os.path.join(PROJECT_ROOT, '03_frontend')
 DIST_DIR = os.path.join(FRONTEND_DIR, 'dist')
 sys.path.insert(0, os.path.join(PROJECT_ROOT, '02_backend'))
 _backend_proc = None
+_ingress_secret = ''
 
 
 def _env_int(*names, default):
@@ -26,7 +27,7 @@ def _env_int(*names, default):
 
 def _bind_host():
     # Workbench's application proxy reaches the engine loopback listener.
-    return '127.0.0.1' if os.getenv('CDSW_APP_PORT') or Path.home() == Path('/home/cdsw') else '0.0.0.0'
+    return '127.0.0.1' if os.getenv('CDSW_APP_PORT') or Path.home() == Path('/home/cdsw') else '127.0.0.1'
 
 
 def _stop_backend():
@@ -58,12 +59,19 @@ def _wait_for_backend(port, timeout=30):
 
 
 def _start_backend(port):
-    global _backend_proc
+    global _backend_proc, _ingress_secret
     import socket
     # Fail instead of accidentally connecting to another app's backend.
     with socket.socket() as sock:
         sock.bind(('127.0.0.1', port))
     env = os.environ.copy()
+    import secrets
+    from common.runtime import auth_mode
+    _ingress_secret = secrets.token_urlsafe(48)
+    env['NPI_INGRESS_SECRET'] = _ingress_secret
+    env['NPI_AUTH_MODE'] = auth_mode()
+    if auth_mode()=='local_demo':
+        env['NPI_LOCAL_ORIGIN'] = 'http://127.0.0.1:'+str(env.get('CDSW_APP_PORT') or env.get('FRONTEND_PORT') or 8100)
     env['BACKEND_PORT'] = str(port)
     env.pop('CDSW_APP_PORT', None)
     _backend_proc = subprocess.Popen([sys.executable, os.path.join(PROJECT_ROOT, '02_backend/start_backend.py')],
@@ -80,6 +88,11 @@ def check_artifacts():
     cfg = get_config()
     def rooted(path):
         return Path(path) if os.path.isabs(path) else Path(PROJECT_ROOT) / path
+    from common.runtime import data_mode
+    if data_mode()=='pilot':
+        if not (Path(DIST_DIR)/'index.html').is_file() or not Path(get_db_path()).is_file():
+            raise RuntimeError('Pilot frontend or isolated ops store is missing; run Pilot preparation')
+        return
     required = [Path(DIST_DIR) / 'index.html', Path(get_db_path()),
                 rooted(cfg.get('ml', {}).get('model_dir', 'models')) / 'risk_model.pkl',
                 rooted(cfg.get('ml', {}).get('model_dir', 'models')) / 'risk_meta.json',
@@ -117,7 +130,14 @@ def create_app(backend_port):
     async def proxy_api(path: str, request: Request):
         if _backend_proc is None or _backend_proc.poll() is not None:
             return JSONResponse({'detail': 'Backend unavailable'}, status_code=503)
-        headers = {k: v for k, v in request.headers.items() if k.lower() not in hop}
+        from common.security import forwarded_identity, INTERNAL, IDENTITY
+        try:
+            identity = forwarded_identity(request,_ingress_secret)
+        except (PermissionError,ValueError,RuntimeError) as error:
+            return JSONResponse({'detail':str(error)},status_code=403)
+        stripped = hop | INTERNAL | IDENTITY | {'authorization','cookie','x-forwarded-for','x-forwarded-host','x-forwarded-proto','forwarded'}
+        headers = {k: v for k, v in request.headers.items() if k.lower() not in stripped}
+        headers.update(identity)
         url = '/api/' + path + ('?' + request.url.query if request.url.query else '')
         client = app.state.backend
         req = client.build_request(request.method, url, content=await request.body(), headers=headers)
@@ -165,10 +185,10 @@ def _run_uvicorn(app, host, port):
     try:
         asyncio.get_running_loop()
     except RuntimeError:
-        uvicorn.run(app, host=host, port=port)
+        uvicorn.run(app, host=host, port=port, proxy_headers=False)
         return
 
-    config = uvicorn.Config(app, host=host, port=port)
+    config = uvicorn.Config(app, host=host, port=port, proxy_headers=False)
     server = uvicorn.Server(config)
     failures = []
 
@@ -198,6 +218,9 @@ def main():
     backend = _env_int('BACKEND_PORT', default=7078)
     if port == backend:
         raise ValueError('Application and backend ports must differ')
+    from common.runtime import auth_mode
+    if mode=='dev' and auth_mode()=='workbench':
+        raise RuntimeError('Workbench requires the production trusted frontend proxy')
     if mode == 'dev':
         _start_backend(backend)
         try:

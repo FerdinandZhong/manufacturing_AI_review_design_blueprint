@@ -6,12 +6,13 @@ const DECISIONS: ReviewDecision[] = ['APPROVED', 'APPROVED_WITH_CONDITIONS', 'RE
 
 interface Props {
   reviewId: string | null
+  onDecision?: () => void
 }
 
 /** Human gate-decision control. Disabled until a GateReview run has produced
  *  a review_id; submits POST /api/review/{review_id}/decision and shows the
  *  persisted gate_reviews row. */
-export const DecisionControl: React.FC<Props> = ({ reviewId }) => {
+export const DecisionControl: React.FC<Props> = ({ reviewId, onDecision }) => {
   const [decision, setDecision] = useState<ReviewDecision>('APPROVED_WITH_CONDITIONS')
   const [rationale, setRationale] = useState('')
   const [adjudicator, setAdjudicator] = useState('')
@@ -24,6 +25,7 @@ export const DecisionControl: React.FC<Props> = ({ reviewId }) => {
     try {
       const row = await postDecision(reviewId, { decision, rationale, adjudicator })
       setResult(row)
+      onDecision?.()
     } finally {
       setSubmitting(false)
     }

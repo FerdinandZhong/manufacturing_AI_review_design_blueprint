@@ -67,16 +67,35 @@ CREATE TABLE IF NOT EXISTS llm_models (
 );
 """
 
-TABLE_NAMES = ["test_results","design_risk_scores","gate_reviews","evidence","annotations","llm_models"]
+SCHEMA_SQL += """
+CREATE TABLE IF NOT EXISTS audit_events (
+    event_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    actor TEXT NOT NULL,
+    authentication TEXT NOT NULL,
+    permission TEXT NOT NULL,
+    method TEXT NOT NULL,
+    path TEXT NOT NULL,
+    outcome TEXT NOT NULL,
+    status_code INTEGER,
+    created_at TEXT DEFAULT (datetime('now'))
+);
+"""
+
+TABLE_NAMES = ["test_results","design_risk_scores","gate_reviews","evidence","annotations","llm_models","audit_events"]
 
 _MIGRATIONS = {
     "gate_reviews": {
+        "snapshot_id": "TEXT",
+        "revision_id": "TEXT",
+        "canonical_program_id": "TEXT",
         "request_id": "TEXT",
         "execution_status": "TEXT DEFAULT 'completed'",
         "execution_error": "TEXT",
         "worker_results": "TEXT",
         "completed_at": "TEXT",
     },
+    "test_results": {"snapshot_id":"TEXT"},
+    "design_risk_scores": {"snapshot_id":"TEXT"},
     "evidence": {"payload_json": "TEXT"},
 }
 

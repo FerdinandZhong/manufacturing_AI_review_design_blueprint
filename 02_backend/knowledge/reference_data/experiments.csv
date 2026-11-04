@@ -1,0 +1,12 @@
+source_id,experiment_id,method,chemistry,peak_cell_temperature_c,total_gas_mol,initial_voltage_v,locator,review_status
+RSC-C8RA06458J,1,Heat ramp,LMO,531,3.2,4.08,"Table 2, experiment 1",Verified against source XML table cells
+RSC-C8RA06458J,2,Heat ramp,LMO,558,2.9,4.08,"Table 2, experiment 2",Verified against source XML table cells
+RSC-C8RA06458J,3,Heat ramp,LMO,518,3.1,4.06,"Table 2, experiment 3",Verified against source XML table cells
+RSC-C8RA06458J,4,Heat ramp,LMO,469,3.1,4.06,"Table 2, experiment 4",Verified against source XML table cells
+RSC-C8RA06458J,5,Heat ramp,LMO,529,4.6,4.10,"Table 2, experiment 5",Verified against source XML table cells
+RSC-C8RA06458J,6,One-sided heating,LMO,528,3.2,4.08,"Table 2, experiment 6",Verified against source XML table cells
+RSC-C8RA06458J,7,One-sided heating,LMO,500,3.3,4.04,"Table 2, experiment 7",Verified against source XML table cells
+RSC-C8RA06458J,8,Stepwise heating,LMO,427,3.4,4.08,"Table 2, experiment 8",Verified against source XML table cells
+RSC-C8RA06458J,9,Stepwise heating,LMO,530,3.6,4.10,"Table 2, experiment 9",Verified against source XML table cells
+RSC-C8RA06458J,10,Reactor heating,LMO,495,5.6,4.08,"Table 2, experiment 10",Verified against source XML table cells
+RSC-C8RA06458J,11,Reactor heating,LMO,595,5.9,4.08,"Table 2, experiment 11",Verified against source XML table cells

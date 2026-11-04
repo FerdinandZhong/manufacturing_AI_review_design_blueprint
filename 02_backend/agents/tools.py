@@ -19,7 +19,7 @@ from common import source
 from common.db import get_connection
 from engineering import traceability
 from ml import risk_model
-from knowledge import kb, ontology
+from knowledge import kb, ontology, semantic
 
 
 def get_program(conn, program_id):
@@ -38,7 +38,7 @@ def get_test_results(conn, program_id):
     own = conn is None
     c = get_connection() if own else conn
     try:
-        rows = c.execute("SELECT * FROM test_results WHERE program_id=?", (program_id,)).fetchall()
+        rows = c.execute("SELECT * FROM test_results WHERE program_id=? AND snapshot_id=?", (program_id,source.snapshot_identity(program_id)["snapshot_id"])).fetchall()
         return [dict(r) for r in rows]
     finally:
         if own:
@@ -65,7 +65,18 @@ def ontology_describe(conn, cls):
     return ontology.describe(cls)
 
 
+def get_semantic_context(conn, program_id):
+    if program_id.partition("@")[0] != semantic.contract()["program_id"]:
+        return {"version": semantic.contract()["version"], "reference": {"source_id": "Not attached for this program"},
+                "constraints": ["The predefined external evidence context is available only for PACK-ATLAS-01."]}
+    if not (semantic.REFERENCES / "manifest.json").is_file():
+        return {"version": semantic.contract()["version"], "reference": {"source_id": "Reference assets not prepared"},
+                "constraints": ["Do not claim that external research was retrieved; the reference package is unavailable."]}
+    return semantic.context(program_id)["packet"]
+
+
 TOOLS = {
+    "get_semantic_context": get_semantic_context,
     "get_program": get_program,
     "list_requirements": list_requirements,
     "get_traceability": get_traceability,
@@ -83,6 +94,7 @@ if __name__ == "__main__":
     showcase = get_config().get("demo", {}).get("showcase_program_id")
 
     assert set(TOOLS) == {
+        "get_semantic_context",
         "get_program", "list_requirements", "get_traceability", "get_test_results",
         "get_design_risk", "get_model_explanation", "kb_search", "get_asset", "ontology_describe",
     }

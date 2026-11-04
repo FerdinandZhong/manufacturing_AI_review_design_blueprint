@@ -11,7 +11,7 @@ python 02_backend/scripts/prepare.py   # one-time; idempotent
 python start_app.py                    # keeps running; http://localhost:8100
 ```
 
-Open the browser to **http://localhost:8100**. The cockpit loads `PACK-ATLAS-01` automatically. No login, no state to reset — the page is always in the pre-gate-review state on first load (gate review has not been run yet).
+Open the browser to **http://localhost:8100**. The cockpit defaults to expanded validation. Select **Original baseline** to follow this original script. No login, no state to reset — the page is always in the pre-gate-review state on first load (gate review has not been run yet).
 
 ---
 
@@ -122,3 +122,9 @@ Select **APPROVED_WITH_CONDITIONS**, add a short rationale ("Close thermal margi
 **"Where does the LLM run?"** — Configured in `config/config.yaml`: CAII endpoint, vLLM, or Ollama. Offline mode uses templates automatically.
 
 **"Is this real manufacturing data?"** — No. Everything is synthetic, seeded, and deterministic. The use case (EV battery-pack NPI, APQP gates, DVP&R, thermal margin) is real; the specific numbers are designed so the demo tells a clean story every time.
+
+## Revised-design comparison
+
+Select Expanded validation for 30 requirements, 48 BOM rows, and 192 independent observations. Thermal headroom averages 10.3 degC against a 10 degC target. Its bench verdict remains MARGINAL. Coverage is 24/30, so the gate is CONDITIONAL.
+
+Select Revised design for 30/30 coverage and 240 follow-up observations. Thermal headroom averages 12.1 degC. The corrective action is CLOSED, and the computed gate is PASS. The small historical model can still report HIGH thermal risk; it does not decide the gate.

@@ -32,9 +32,20 @@ from knowledge.kb import build_kb
 
 
 def main() -> None:
+    from common.runtime import data_mode
+    if data_mode()=='pilot':
+        from common import providers
+        init_db()
+        snapshot = providers.load()
+        print('Pilot source validated read-only: '+snapshot['source_id']+' / '+snapshot['snapshot_id'])
+        print('Pilot review execution and ML remain unavailable pending domain acceptance. No demo artifacts were built.')
+        return
+    from data_generation.generate_snapshots import generate
+    generate()
     init_db()
 
     programs = [p["program_id"] for p in source.list_programs()]
+    programs += [s["program_key"] for s in source.list_scenarios() if "@" in s["program_key"]]
     results = []
     for pid in programs:
         results.extend(run_test_bench(pid))
@@ -43,6 +54,9 @@ def main() -> None:
 
     showcase = get_config().get("demo", {}).get("showcase_program_id")
     scores = score_program(showcase)
+    for pid in programs:
+        if "@" in pid:
+            score_program(pid)
 
     kb_rows = build_kb()
 

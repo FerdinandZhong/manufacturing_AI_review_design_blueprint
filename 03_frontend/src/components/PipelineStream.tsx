@@ -1,6 +1,33 @@
 import React from 'react'
 import { Loader2, CheckCircle2, MinusCircle, AlertTriangle } from 'lucide-react'
 import { WorkflowGraph, type WorkflowNode } from './WorkflowGraph'
+import { assetUrl } from '../api'
+
+export type WorkerAssessment = {
+  kind: 'model_risk'; score: number | null; entity_id: string | null; risk_band: string | null;
+  model_version: string | null; scored_requirements: number; high_risk_requirements: number;
+  calibration: string; note: string; feature_basis: string;
+} | {
+  kind: 'retrieval'; query: string; method: string; note: string;
+  hits: { asset_id: string; title: string; score: number; lexical_score: number; vector_score: number;
+    evidence_kind: string; support: string; ocr_unverified: boolean }[];
+}
+
+export function AssessmentDetails({ assessment }: { assessment: WorkerAssessment }) {
+  if (assessment.kind === 'model_risk') return <div className="assessment-panel" aria-label="Traditional ML score">
+    <div className="assessment-score"><span>Model predicted risk</span><strong>{assessment.score == null ? 'Unavailable' : `${(assessment.score * 100).toFixed(1)}%`}</strong><span>{assessment.risk_band ? `${assessment.risk_band} risk` : 'No score'}</span></div>
+    <p>{assessment.entity_id} · {assessment.high_risk_requirements} HIGH / {assessment.scored_requirements} scored requirements</p>
+    <p className="assessment-note">{assessment.note}</p>
+    <details><summary>Model and score interpretation</summary><p>Model version: {assessment.model_version || 'Unavailable'}</p><p>{assessment.feature_basis}</p><p>Model confidence calibration: not validated.</p></details>
+  </div>
+  return <div className="assessment-panel" aria-label="Retrieval relevance scores">
+    <p className="assessment-note">Relevance score · 0–1 scale. {assessment.note}</p>
+    {assessment.hits.length ? <ol className="retrieval-score-list">{assessment.hits.map(hit => <li key={hit.asset_id}>
+      <div><a href={assetUrl(hit.asset_id)} target="_blank" rel="noreferrer">{hit.title}</a><small>{hit.evidence_kind.replaceAll('_', ' ')} · {hit.support}{hit.ocr_unverified ? ' · Unverified OCR' : ''}</small></div><strong aria-label={`Relevance ${hit.score.toFixed(3)}`}>{hit.score.toFixed(3)}</strong>
+    </li>)}</ol> : <p>No relevant evidence found. No retrieval confidence score is assigned.</p>}
+    <details><summary>Query and score calculation</summary><p>{assessment.query}</p><p>{assessment.method}</p>{assessment.hits.map(hit => <p key={hit.asset_id}>{hit.asset_id}: lexical {hit.lexical_score.toFixed(3)} · vector {hit.vector_score.toFixed(3)}</p>)}</details>
+  </div>
+}
 
 /** One row in a streamed pipeline — a worker (investigation) or a step (retrain). */
 export interface PipelineItem {
@@ -9,6 +36,7 @@ export interface PipelineItem {
   status: 'running' | 'ok' | 'skip' | 'error'
   detail?: string        // worker findings (bullet lines) or step detail
   chips?: string[]       // evidence ids
+  assessment?: WorkerAssessment
   mono?: boolean         // render label mono (console character)
 }
 
@@ -124,6 +152,7 @@ export const PipelineStream: React.FC<Props> = ({
                   {it.detail}
                 </p>
               )}
+              {it.assessment && <AssessmentDetails assessment={it.assessment} />}
               {it.chips && it.chips.length > 0 && (
                 <div className="flex flex-wrap gap-1 mt-2">
                   {it.chips.map(c => (

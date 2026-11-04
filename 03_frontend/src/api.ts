@@ -1,6 +1,8 @@
 import axios from 'axios'
 
-export const api = axios.create({ baseURL: '/api' })
+export const api = axios.create({ baseURL: '/api', headers: { 'X-NPI-Request': '1' } })
+export interface RuntimeStatus { mode: 'demo' | 'pilot'; authorization: string; identity: { actor: string; permission: 'RO' | 'RW'; authentication: string }; source_ready: boolean; review_ready: boolean; risk_status: string; source: {state: string; provider: string; detail: string; source_id?: string; revision_id?: string; snapshot_id?: string; extracted_at?: string; provenance?: string; freshness?: string } }
+export const getRuntimeStatus = () => api.get<RuntimeStatus>('/runtime/status').then(r => r.data)
 
 // ── programs ────────────────────────────────────────────────────────────────
 
@@ -33,7 +35,12 @@ export interface Matrix {
   rows: MatrixRow[]
 }
 
+export interface SharedMetrics { snapshot_id: string; revision_id: string; recommendation: string | null; prepared: boolean; missing_standards: string[]; definitions: Record<string, string>; tests_needing_attention: number; high_risk_requirements: number; observation_count: number; open_issues: number; unscored_requirements: number; bom_cost: number; bom_mass_kg: number; executed_coverage: Coverage; action_completion: {complete: number;total: number} }
 export interface ProgramDetail {
+  issues: {issue_id:string;title:string;status:string;corrective_action:string;owner:string;verification_test_id:string}[]
+  history: {revision_id:string;change:string}[]
+  metrics: SharedMetrics
+  identity: { snapshot_id: string; revision_id: string }
   program: Program
   coverage: Coverage
   matrix: Matrix
@@ -146,6 +153,7 @@ export const getMatrix = (pid: string) =>
 // ── knowledge base / ontology ───────────────────────────────────────────────
 
 export interface KbHit {
+  evidence_kind?: string
   provenance?: string
   source_url?: string
   license_url?: string
@@ -158,10 +166,12 @@ export interface KbHit {
   linked_entity_type: string
   linked_entity_id: string
   score: number
+  retrieval?: { method: string; matched_terms: string[]; chunks: { chunk_id: string; page: number; section: string; text: string; source_sha256: string; extraction_method: string; verification: string }[] }
+
 }
 
-export const searchKb = (q: string, cls?: string, k = 3) =>
-  api.get<KbHit[]>('/kb/search', { params: { q, cls, k } }).then(r => r.data)
+export const searchKb = (q: string, cls?: string, k = 3, externalOnly = false, programId?: string, evidenceKind = 'all') =>
+  api.get<KbHit[]>('/kb/search', { params: { q, cls, k, external_only: externalOnly, program_id: programId, evidence_kind: evidenceKind } }).then(r => r.data)
 
 export const assetUrl = (id: string) => `/api/asset/${id}`
 
@@ -221,7 +231,7 @@ export const streamReview = (
   reviewId: string,
   onEvent: (e: Record<string, unknown>) => void,
 ) =>
-  fetch(`/api/review/${pid}/stream?review_id=${encodeURIComponent(reviewId)}`)
+  fetch(`/api/review/${pid}/stream?review_id=${encodeURIComponent(reviewId)}`, { headers: { 'X-NPI-Request': '1' } })
     .then(res => { if (!res.ok) throw new Error(`Review failed (${res.status})`); return streamSSE(res, onEvent) })
 
 export interface LlmModel {
@@ -256,3 +266,54 @@ export const updateLlmModel = (id: number, body: RegisterModelBody) =>
 
 export const testLlmModel = (id: number) =>
   api.post<{ ok: boolean; message: string }>(`/config/llm/models/${id}/test`).then(r => r.data)
+
+export interface NifiSnapshot {
+  mode: 'sample' | 'live'
+  group_id: string
+  name: string
+  refreshed: string
+  processors: { id: string; name: string; state: string; validation: string; type: string; threads: number | null }[]
+  connections: { id: string; source: string; target: string; relationships: string[]; queued: number | null }[]
+  bulletins: { id: string; source: string; level: string; timestamp: string; message: string }[]
+  metrics: { queued: number | null; bytes_queued: number | null; active_threads: number | null; received: number | null }
+  limitations: string[]
+}
+export const getNifiConfig = () => api.get<{ configured: boolean; group_id: string; read_only: boolean }>('/nifi/config').then(r => r.data)
+export const getNifiSnapshot = (mode: 'sample' | 'live', signal?: AbortSignal) => api.get<NifiSnapshot>('/nifi/snapshot', { params: { mode }, signal }).then(r => r.data)
+
+export interface SemanticAsset {
+  id: string; title: string; modality: 'image' | 'pdf' | 'text'; caption: string
+  locator: string; source_url: string; sha256: string; mime_type: string; experiment_ids: string[]; author?: string; license?: string; license_url?: string; applicability?: string; state?: string
+}
+export interface Experiment {
+  source_id: string; experiment_id: string; method: string; chemistry: string
+  peak_cell_temperature_c: number | null; total_gas_mol: number | null; initial_voltage_v: number | null; locator: string
+}
+export interface SemanticEdge { id: string; from: string; to: string; label: string; kind: string; rule: string }
+export interface SemanticNode { id: string; label: string; kind: string; source: string; key: string; description: string; column: number; row: number; records: unknown; grain: string; origin: string }
+export interface SemanticContext {
+  model: { version: string; name: string; status: string; questions: { id: string; title: string; description: string; enabled: boolean; missing_source: string }[]; concepts: { id: string; label: string; definition: string; boundary: string; aliases: string[] }[]; metrics: { id: string; label: string; formula: string; unit: string; grain: string; boundary: string }[] }
+  packet: { facts: { id: string; label: string; value: string; source: string; origin: string }[]; constraints: string[]; reference: { title: string; attribution: string; license_url: string; source_url: string; source_id: string }; [key: string]: unknown }
+  context_sha256: string
+  graph: { nodes: SemanticNode[]; edges: SemanticEdge[] }
+  research_state: string
+  source_states: { id: string; state: string }[]
+  active_edges: string[]
+  evidence: SemanticAsset[]
+  measurements: Experiment[]
+  steps: { label: string; detail: string }[]
+}
+export interface SemanticAnswer extends SemanticContext {
+  answer: string; narration: string; note: string; image_inputs: string[]; prompt: unknown; answer_sha256: string
+}
+export const getSemanticContext = (questionId: string, signal?: AbortSignal, programId = 'PACK-ATLAS-01') => api.get<SemanticContext>('/semantic/context', { params: { question_id: questionId, program_id: programId }, signal }).then(r => r.data)
+export const explainSemanticContext = (questionId: string, narration: 'template' | 'model', includeImages: boolean, signal?: AbortSignal, programId = 'PACK-ATLAS-01') => api.post<SemanticAnswer>('/semantic/explain', { question_id: questionId, narration, include_images: includeImages, program_id: programId }, { signal }).then(r => r.data)
+export const semanticAssetUrl = (id: string) => `/api/semantic/assets/${encodeURIComponent(id)}`
+
+export interface KnowledgeReadiness {
+  index: { state: string; detail?: string }
+  embedding: { version: string; model: string; dimension: number }
+  ocr: { state: string; credential_validated: boolean; reason: string }
+  image_similarity: { state: string; detail: string }
+}
+export const getKnowledgeReadiness = () => api.get<KnowledgeReadiness>('/kb/readiness').then(r => r.data)

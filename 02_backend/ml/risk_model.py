@@ -41,8 +41,10 @@ def _load_model():
 
 
 def score_program(program_id: str) -> list[dict]:
+    from common.runtime import require_demo
+    require_demo('Synthetic model scoring')
     model, meta = _load_model()
-    df = build_features([program_id])
+    df = build_features([program_id], require_labels=False)
     out = []
     conn = get_connection()
     try:
@@ -63,6 +65,8 @@ def score_program(program_id: str) -> list[dict]:
                         "entity_id": row["req_id"], "model_version": meta["model_version"],
                         "risk_prob": risk_prob, "risk_band": risk_band,
                         "top_features": top_features})
+        from common import source
+        conn.execute("UPDATE design_risk_scores SET snapshot_id=? WHERE program_id=?", (source.snapshot_identity(program_id)["snapshot_id"],program_id))
         conn.commit()
     finally:
         conn.close()
@@ -70,17 +74,25 @@ def score_program(program_id: str) -> list[dict]:
 
 
 def get_scores(program_id: str) -> list[dict]:
+    from common.runtime import data_mode
+    if data_mode()=='pilot':
+        return []
     conn = get_connection()
     try:
         rows = conn.execute(
-            "SELECT program_id,entity_type,entity_id,model_version,risk_prob,risk_band,top_features,scored_at "
+            "SELECT program_id,entity_type,entity_id,model_version,risk_prob,risk_band,top_features,scored_at,snapshot_id "
             "FROM design_risk_scores WHERE program_id=? AND entity_type='requirement'", (program_id,))
-        return [dict(r) | {"top_features": json.loads(r["top_features"])} for r in rows]
+        from common import source
+        identity = source.snapshot_identity(program_id)
+        return [dict(r) | {"top_features": json.loads(r["top_features"])} for r in rows if r["snapshot_id"] == identity["snapshot_id"]]
     finally:
         conn.close()
 
 
 def explain() -> list[dict]:
+    from common.runtime import data_mode
+    if data_mode()=='pilot':
+        return []
     model, meta = _load_model()
     order = sorted(range(len(FEATURES)), key=lambda i: model.feature_importances_[i], reverse=True)[:5]
     return [{"feature": FEATURES[i], "importance": float(model.feature_importances_[i])} for i in order]
@@ -89,6 +101,11 @@ def explain() -> list[dict]:
 if __name__ == "__main__":
     from common.db import init_db
     from engineering.test_bench import run_test_bench
+    import tempfile
+    import common.db as db
+    _tmp = tempfile.mkdtemp()
+    db.get_db_path = lambda: os.path.join(_tmp, 'risk.db')
+    get_config().setdefault('ml', {})['model_dir'] = os.path.join(_tmp, 'models')
     init_db()
     showcase = get_config().get("demo", {}).get("showcase_program_id")
     for _p in ["PACK-ORION-00", "PACK-VEGA-00", showcase]:

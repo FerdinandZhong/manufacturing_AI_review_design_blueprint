@@ -24,7 +24,7 @@ from agents import llm_client
 import uuid
 from typing import Literal
 
-from fastapi import FastAPI, Depends, HTTPException, Query, status
+from fastapi import Request, FastAPI, Depends, HTTPException, Query, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, Response
 from pydantic import BaseModel, Field
@@ -32,12 +32,15 @@ from pydantic import BaseModel, Field
 from common.db import get_connection
 from common import source
 from engineering import traceability
+from engineering.metrics import summary as metric_summary
 from engineering.test_bench import run_test_bench
 from ml import risk_model
 from knowledge import kb, ontology
 from agents.supervisor import run_gate_review
 from agents.tools import TOOLS
 from common.evidence import list_review_evidence
+from common.nifi import router as nifi_router
+from api.semantic_api import router as semantic_router
 
 app = FastAPI(
     title="Vehicle NPI Platform",
@@ -46,12 +49,51 @@ app = FastAPI(
     redoc_url=None,
 )
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+app.include_router(nifi_router)
+app.include_router(semantic_router)
+
+from common.access import enforce_access
+from common.providers import SourceUnavailable
+from common.runtime import data_mode, auth_mode
+app.middleware('http')(enforce_access)
+
+@app.exception_handler(SourceUnavailable)
+async def unavailable_source(request, error):
+    from fastapi.responses import JSONResponse
+    return JSONResponse({'detail':str(error),'source_ready':False,'mode':'pilot'},status_code=503)
+
+@app.get('/api/runtime/status')
+def runtime_status(request: Request):
+    from common import providers
+    review_ready = False
+    if data_mode()=='pilot':
+        source_status = providers.readiness()
+    else:
+        try:
+            scenarios = source.list_scenarios()
+            source.backend()
+            for key in source.SOURCE_TABLES:
+                source._csv(key)
+            source_status = {'state':'ready' if len(scenarios)==3 else 'unready', 'provider':'seeded_demo', 'detail':'Synthetic engineering demonstration'}
+            try:
+                summaries = [metric_summary(s['program_key']) for s in scenarios]
+                from common.config import get_config
+                from pathlib import Path
+                cfg = get_config()
+                rooted = lambda p: Path(p) if Path(p).is_absolute() else Path(PROJECT_ROOT)/p
+                model = rooted(cfg.get('ml',{}).get('model_dir','models'))
+                knowledge = rooted(cfg.get('data',{}).get('kb_dir','data/kb'))/'assets.lance'
+                review_ready = len(summaries)==3 and all(s['prepared'] and s['unscored_requirements']==0 for s in summaries) and all(p.exists() for p in (model/'risk_model.pkl',model/'risk_meta.json',knowledge))
+            except (RuntimeError,sqlite3.Error):
+                review_ready = False
+        except (RuntimeError,ValueError,OSError):
+            source_status = {'state':'unready','provider':'seeded_demo','detail':'Demo source artifacts are missing or invalid; run Demo preparation'}
+    return {'mode':data_mode(),'authorization':auth_mode(),'identity':request.state.identity,
+            'source':source_status,'source_ready':source_status['state']=='ready',
+            'review_ready':review_ready,
+            'risk_status':'synthetic_demo' if data_mode()=='demo' else 'unavailable_until_domain_validation',
+            'remote_acceptance':'pending'}
+
 
 
 @app.get("/api/health")
@@ -122,7 +164,7 @@ class QueryPage(BaseModel):
 
 @app.get('/api/programs/{pid}/data/{dataset}', response_model=QueryPage,
          tags=['Engineering queries'], summary='Query requirements, designs, BOM, plans or stored test results')
-def query_program_data(pid: str, dataset: Literal['requirements', 'design', 'bom', 'test_plans', 'test_results'],
+def query_program_data(pid: str, dataset: Literal['requirements', 'design', 'bom', 'test_plans', 'test_results', 'observations', 'issues', 'history'],
                        q: str = Query(default='', max_length=200),
                        requirement_id: str | None = Query(default=None, max_length=128),
                        verdict: Literal['PASS', 'MARGINAL', 'FAIL'] | None = None,
@@ -140,7 +182,10 @@ def query_program_data(pid: str, dataset: Literal['requirements', 'design', 'bom
         raise HTTPException(422, 'verdict is only supported for test_results')
     loaders = {'requirements': source.list_requirements, 'design': source.list_design_specs,
                'bom': source.list_bom, 'test_plans': source.list_test_plans,
-               'test_results': lambda p: TOOLS['get_test_results'](None, p)}
+               'test_results': lambda p: TOOLS['get_test_results'](None, p),
+               'observations':source.list_observations,
+               'issues':lambda p:(source.get_snapshot(p) or {}).get('issues',[]),
+               'history':lambda p:(source.get_snapshot(p) or {}).get('history',[])}
     rows = _clean(loaders[dataset](pid))
     if dataset == 'bom':
         specs = {s['spec_id']: s for s in source.list_design_specs(pid)}
@@ -154,9 +199,9 @@ def query_program_data(pid: str, dataset: Literal['requirements', 'design', 'bom
             and (not q or q.casefold() in json.dumps(r, ensure_ascii=False).casefold())]
     rows.sort(key=lambda r: json.dumps(r, sort_keys=True))
     return QueryPage(program_id=pid, dataset=dataset, total=len(rows), limit=limit, offset=offset,
-                     items=rows[offset:offset + limit], provenance=(
+                     items=rows[offset:offset + limit], provenance=('Validated read-only pilot source records' if data_mode()=='pilot' else (
                          'Persisted synthetic test-bench results; not physical lab measurements'
-                         if dataset == 'test_results' else 'Seeded engineering reference data'))
+                         if dataset == 'test_results' else 'Seeded engineering reference data')))
 
 
 class AssetContent(BaseModel):
@@ -178,6 +223,8 @@ def read_asset_content(asset_id: str):
     import base64
     try:
         asset = kb.get_asset(asset_id)
+    except ValueError:
+        raise HTTPException(409, "Asset snapshot is stale; rebuild the knowledge base") from None
     except KeyError:
         raise HTTPException(404, 'Asset not found')
     blob = bytes(asset['blob'])
@@ -190,6 +237,21 @@ def read_asset_content(asset_id: str):
                         content=blob.decode('utf-8') if is_text else base64.b64encode(blob).decode('ascii'),
                         provenance=asset.get('provenance', ''))
 
+@app.get('/api/scenarios')
+def list_scenarios():
+    return source.list_scenarios()
+
+
+@app.get('/api/programs/{pid}/snapshot')
+def get_snapshot(pid: str):
+    _get_program_or_404(pid)
+    snapshot = source.get_snapshot(pid)
+    return _clean({'identity':source.snapshot_identity(pid), 'metrics':metric_summary(pid),
+                   'issues':snapshot.get('issues',[]) if snapshot else [],
+                   'history':snapshot.get('history',[]) if snapshot else [],
+                   'observations':source.list_observations(pid)})
+
+
 @app.get("/api/programs")
 def list_programs():
     return _clean(source.list_programs())
@@ -197,8 +259,17 @@ def list_programs():
 
 @app.get("/api/programs/{pid}")
 def get_program(pid: str):
-    program = _get_program_or_404(pid)
+    program = dict(_get_program_or_404(pid))
+    metrics = metric_summary(pid)
+    latest = metrics['latest_review']
+    if latest:
+        program['gate_status'] = latest['decision'] or latest['recommendation'] or 'PENDING'
+        program['stage'] = latest['state']
     return _clean({
+        'identity':source.snapshot_identity(pid),
+        'metrics':metrics,
+        'issues':(source.get_snapshot(pid) or {}).get('issues',[]),
+        'history':(source.get_snapshot(pid) or {}).get('history',[]),
         "program": program,
         "coverage": traceability.coverage(pid),
         "matrix": traceability.build_matrix(pid),
@@ -238,7 +309,7 @@ def get_results(pid: str):
 @app.get("/api/programs/{pid}/risk")
 def get_risk(pid: str):
     _get_program_or_404(pid)
-    return {"scores": risk_model.get_scores(pid), "explanation": risk_model.explain()}
+    return {"scores": risk_model.get_scores(pid), "explanation": risk_model.explain(), "status":"unavailable_until_domain_validation" if data_mode()=="pilot" else "synthetic_demo"}
 
 
 @app.get("/api/programs/{pid}/matrix")
@@ -255,12 +326,33 @@ def post_testbench(pid: str):
 
 # ── knowledge base / ontology ───────────────────────────────────────────────
 
+@app.exception_handler(kb.IncompatibleIndex)
+async def incompatible_knowledge_index(request, exc):
+    from fastapi.responses import JSONResponse
+    return JSONResponse(status_code=503, content={'detail':str(exc), 'code':'incompatible_knowledge_index'})
+
+
+@app.get('/api/kb/readiness')
+def knowledge_readiness():
+    from knowledge.openai_ocr import readiness
+    try:
+        kb._open()
+        index = {'state':'available'}
+    except (RuntimeError, OSError) as exc:
+        index = {'state':'unavailable', 'detail':str(exc)}
+    return {'index':index, 'embedding':kb.embedding_contract(), 'ocr':readiness(),
+            'image_similarity':{'state':'unavailable', 'detail':'No image encoder configured; images use captions and cached unverified OCR.'}}
+
+
 @app.get("/api/kb/search")
 def kb_search(q: str = Query(min_length=1, max_length=500), cls: str | None = None,
-              k: int = Query(default=3, ge=1, le=20)):
+              k: int = Query(default=3, ge=1, le=20), external_only: bool = False, program_id: str | None = None, evidence_kind: Literal['all','direct_demo','historical_demo','external_reference'] = 'all'):
     # kb.search() rows carry the raw asset blob; drop it here (fetch it via
     # /api/asset/{id} instead) so search results stay small JSON, not binary.
-    hits = kb.search(q, ontology_filter=cls, k=k)
+    if program_id:
+        _get_program_or_404(program_id)
+    hits = kb.search(q, ontology_filter=cls, k=k, external_only=external_only,
+                     program_id=program_id, evidence_kind=evidence_kind)
     return [{kk: v for kk, v in h.items() if kk != "blob"} for h in hits]
 
 
@@ -268,6 +360,8 @@ def kb_search(q: str = Query(min_length=1, max_length=500), cls: str | None = No
 def get_asset(asset_id: str):
     try:
         asset = kb.get_asset(asset_id)
+    except ValueError:
+        raise HTTPException(409, "Asset snapshot is stale; rebuild the knowledge base") from None
     except KeyError:
         raise HTTPException(404, f"Asset not found: {asset_id}")
     media_type = _MODALITY_MEDIA_TYPE.get(asset["modality"], "application/octet-stream")
@@ -285,6 +379,8 @@ def get_asset(asset_id: str):
 def get_asset_metadata(asset_id: str):
     try:
         asset = kb.get_asset(asset_id)
+    except ValueError:
+        raise HTTPException(409, "Asset snapshot is stale; rebuild the knowledge base") from None
     except KeyError:
         raise HTTPException(404, f"Asset not found: {asset_id}")
     return {key: asset.get(key) for key in (
@@ -387,7 +483,7 @@ class DecisionBody(BaseModel):
 
 
 @app.post("/api/review/{review_id}/decision")
-def review_decision(review_id: str, body: DecisionBody, conn=Depends(get_db)):
+def review_decision(review_id: str, body: DecisionBody, request: Request, conn=Depends(get_db)):
     if body.decision not in _DECISIONS:
         raise HTTPException(400, f"decision must be one of {sorted(_DECISIONS)}")
 
@@ -395,14 +491,15 @@ def review_decision(review_id: str, body: DecisionBody, conn=Depends(get_db)):
     if exists is None:
         raise HTTPException(404, f"Gate review not found: {review_id}")
 
+    actor = request.state.identity['actor'] if auth_mode()=='workbench' else body.adjudicator
     annotation_id = f"ANN-{uuid.uuid4().hex[:12].upper()}"
     conn.execute(
         "INSERT INTO annotations(annotation_id,review_id,decision,rationale,adjudicator) VALUES(?,?,?,?,?)",
-        (annotation_id, review_id, body.decision, body.rationale, body.adjudicator),
+        (annotation_id, review_id, body.decision, body.rationale, actor),
     )
     conn.execute(
-        "UPDATE gate_reviews SET decided_by=?, decision=?, state='RELEASED' WHERE review_id=?",
-        (body.adjudicator, body.decision, review_id),
+        "UPDATE gate_reviews SET decided_by=?, decision=?, state=? WHERE review_id=?",
+        (actor, body.decision, "GATE_REVIEW" if body.decision == "REJECTED" else "RELEASED", review_id),
     )
     conn.commit()
 

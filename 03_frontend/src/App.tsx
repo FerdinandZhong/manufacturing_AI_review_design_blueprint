@@ -1,70 +1,78 @@
+import { useEffect, useState } from 'react'
+import { Boxes, ChevronRight, Factory, LayoutDashboard, Network, Search, ShieldCheck, Share2, Library } from 'lucide-react'
 import { ModelsView } from './components/ModelsView'
-import { useState } from 'react'
-import { StageTracker } from './components/StageTracker'
-import { RequirementsTable } from './components/RequirementsTable'
-import { RiskPanel } from './components/RiskPanel'
-import { TraceabilityMatrix } from './components/TraceabilityMatrix'
-import { GateReview } from './components/GateReview'
+import { SemanticView } from './components/SemanticView'
+import { NifiView } from './components/NifiView'
+import { CockpitView } from './components/CockpitView'
 import { KnowledgeCards } from './components/KnowledgeCards'
-import { DecisionControl } from './components/DecisionControl'
+import { getRuntimeStatus, getPrograms } from './api'
+import type { RuntimeStatus, Program } from './api'
+import { PilotSourceView } from './components/PilotSourceView'
+import './App.css'
+import './uob-alignment.css'
 
-// Dashboard A only (Dashboard B is Phase 2, out of scope). A single-page
-// cockpit is the lazier-and-correct MVP for one dashboard — no router needed.
-const PROGRAM_ID = 'PACK-ATLAS-01'
+const SCENARIOS = [{key:'PACK-ATLAS-01',label:'Original baseline'}, {key:'PACK-ATLAS-01@atlas-v2',label:'Expanded validation'}, {key:'PACK-ATLAS-01@atlas-v3',label:'Revised design'}]
+const pages = [
+  { id: 'cockpit', label: 'Program Cockpit', icon: LayoutDashboard, group: 'ENGINEERING', description: 'Review requirements, engineering evidence, and release readiness for your battery-pack program.' },
+  { id: 'knowledge', label: 'Knowledge base', icon: Library, group: 'ENGINEERING', description: 'Browse original source material, attribution, and the engineering context attached to each asset.' },
+  { id: 'semantic', label: 'Semantic context', icon: Share2, group: 'ENGINEERING INTELLIGENCE', description: 'See how AI connects program records with real figures, documents, and published measurements.' },
+  { id: 'nifi', label: 'NiFi reader', icon: Network, group: 'DATA OPERATIONS', description: 'Inspect flow health, processor states, and queued data in one read-only workspace.' },
+  { id: 'models', label: 'Models', icon: Boxes, group: 'WORKSPACE', description: 'Manage language models for agent findings and gate narratives.' },
+] as const
+type View = typeof pages[number]['id']
 
 export default function App() {
-  const [view, setView] = useState<'cockpit' | 'models'>('cockpit')
-  const [reviewId, setReviewId] = useState<string | null>(null)
-
+  const [programId, setProgramId] = useState('PACK-ATLAS-01@atlas-v2')
+  const [runtime, setRuntime] = useState<RuntimeStatus | null>(null)
+  const [runtimeError, setRuntimeError] = useState('')
+  const [pilotPrograms, setPilotPrograms] = useState<Program[]>([])
+  useEffect(() => {
+    getRuntimeStatus().then(async status => {
+      setRuntime(status)
+      if (status.mode === 'pilot' && status.source_ready) { const programs = await getPrograms(); setPilotPrograms(programs); setProgramId(programs[0]?.program_id || '') }
+    }).catch(() => setRuntimeError('Workspace authorization or runtime status is unavailable. Check deployment configuration.'))
+  }, [])
+  const [view, setView] = useState<View>('cockpit')
+  const [search, setSearch] = useState('')
+  const page = pages.find(p => p.id === view)!
+  const navigate = (id: View) => { setView(id); setSearch('') }
   return (
-    <div className="min-h-screen flex flex-col bg-surface-0 font-sans">
-
-      {/* ── Cloudera header ── */}
-      <header className="bg-header border-b-[3px] border-accent flex items-center px-6 py-0 shrink-0 h-14">
-        <div className="flex items-center gap-3 pr-8 border-r border-white/10">
-          <span className="text-white font-black text-lg tracking-[0.06em] leading-none select-none">
-            CLOUDERA
-          </span>
-        </div>
-        <div className="px-6">
-          <p className="text-white font-semibold text-sm leading-tight">Vehicle NPI Platform</p>
-          <p className="text-white/40 text-2xs leading-tight">
-            Agentic NPI lifecycle · Cloudera AI Applied ML Prototype
-          </p>
-        </div>
-        <nav className="ml-auto flex gap-2" aria-label="Main navigation">
-          {(['cockpit', 'models'] as const).map(tab => <button key={tab} onClick={() => setView(tab)} aria-current={view === tab ? 'page' : undefined}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold text-white ${view === tab ? 'bg-white/20' : 'bg-white/10 hover:bg-white/20'}`}>
-            {tab === 'cockpit' ? 'Program Cockpit' : 'Models'}
-          </button>)}
-        </nav>
-      </header>
-      {view === 'models' && <ModelsView />}
-
-      {/* ── Body ── */}
-      <div className={`flex-1 p-5 space-y-4 ${view !== 'cockpit' ? 'hidden' : ''}`}>
-        <StageTracker programId={PROGRAM_ID} />
-
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_1.3fr_1fr] gap-4">
-          {/* Left */}
-          <div className="space-y-4">
-            <RequirementsTable programId={PROGRAM_ID} />
-            <RiskPanel programId={PROGRAM_ID} />
+    <div className="workspace-shell" data-view={view}>
+      <a className="skip-link" href="#workspace-content">Skip to content</a>
+      <aside className="workspace-sidebar">
+        <button className="brand" onClick={() => navigate('cockpit')} aria-label="Cloudera workspace home">
+          <img src="./cloudera-wordmark.png" alt="Cloudera" />
+        </button>
+        <div className="workspace-identity"><span className="workspace-dot" /><div><strong>Vehicle NPI</strong><small>Manufacturing workspace</small></div></div>
+        <nav aria-label="Main navigation">{pages.map((p, i) => <div key={p.id}>{(i === 0 || pages[i - 1].group !== p.group) && <p className="nav-label">{p.group}</p>}<button className={`nav-item ${view === p.id ? 'active' : ''}`} onClick={() => navigate(p.id)} aria-current={view === p.id ? 'page' : undefined}><p.icon size={18} /><span>{p.label}</span><ChevronRight size={14} /></button></div>)}</nav>
+        <div className="sidebar-note"><ShieldCheck size={21} /><strong>Evidence-led decisions</strong><p>From engineering requirements to a reviewed release decision.</p></div>
+        <div className="workspace-profile"><span className="avatar"><Factory size={16} /></span><div><strong>Cloudera AI</strong><small>Applied ML Prototype</small></div></div>
+      </aside>
+      <main className="workspace-main" id="workspace-content" tabIndex={-1}>
+        <header className="global-header">
+          <div className="workspace-search"><Search size={16} /><input aria-label="Find a workspace page" placeholder="Find a workspace page…" value={search} onChange={e => setSearch(e.target.value)} onKeyDown={e => { if (e.key === 'Escape') setSearch('') }} />
+            {search && <div className="search-results">{pages.filter(p => `${p.label} ${p.description}`.toLowerCase().includes(search.toLowerCase())).map(p => <button key={p.id} onClick={() => navigate(p.id)}>{p.label}<ChevronRight size={14} /></button>)}{!pages.some(p => `${p.label} ${p.description}`.toLowerCase().includes(search.toLowerCase())) && <p>No matching pages.</p>}</div>}
           </div>
-
-          {/* Center */}
-          <div className="space-y-4">
-            <TraceabilityMatrix programId={PROGRAM_ID} />
-            <GateReview programId={PROGRAM_ID} onReviewDone={setReviewId} />
-            <DecisionControl reviewId={reviewId} />
-          </div>
-
-          {/* Right */}
-          <div className="space-y-4">
-            <KnowledgeCards />
-          </div>
+          <div className="top-actions"><span className="workspace-badge">{runtime ? `${runtime.mode === 'demo' ? 'Demo' : 'Pilot'} · ${runtime.identity.permission}` : 'Checking workspace'}</span><span className="header-profile"><img src="./favicon.svg" alt="" /><span><strong>Vehicle manufacturing</strong><small>Cloudera AI workspace</small></span></span></div>
+        </header>
+        <div className="breadcrumb">AI workspace <ChevronRight size={12} /><span>{page.label}</span><small>New product introduction</small></div>
+        <div className="workspace-page">
+          <section className="page-heading" hidden={view === 'nifi'}><div><p className="eyebrow">{page.group}</p><h1>{page.label}</h1><p>{page.description}</p></div><span className="context-chip">{view === 'cockpit' ? (runtime?.mode === 'pilot' ? 'Read-only pilot inspection' : programId) : view === 'nifi' ? 'Read-only inspection' : view === 'semantic' ? 'Predefined context · Multimodal evidence' : view === 'knowledge' ? 'Attributed source collection' : 'Narration configuration'}</span></section>
+          {runtime?.mode === 'demo' && (view === 'cockpit' || view === 'semantic' || view === 'knowledge') && <div className="program-context"><label className="revision-control"><span>Engineering revision</span><select aria-label="Engineering revision" value={programId} onChange={e => setProgramId(e.target.value)}>{SCENARIOS.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}</select></label><span className="program-source-status">Synthetic demo data · {runtime.source_ready ? 'Ready' : 'Not ready'}</span></div>}
+          {runtimeError && <p role="alert" className="reader-notice reader-error">{runtimeError}</p>}
+          {runtime?.mode === 'pilot' && <p className="reader-caption">Pilot source · {runtime.source.state} · {runtime.source.detail}</p>}
+          {runtime?.mode === 'demo' && !runtime.review_ready && <p className="reader-notice">Review artifacts are unready. Run Demo preparation before reviewing.</p>}
+          {runtime?.mode === 'pilot' && !runtime.source_ready && <p role="alert" className="reader-notice">Pilot source is unready. Configure a validated read-only source. No demo data was substituted.</p>}
+          {runtime?.mode === 'pilot' && runtime.source_ready && view === 'cockpit' && <><label className="context-chip">Pilot program <select aria-label="Pilot program" value={programId} onChange={e => setProgramId(e.target.value)}>{pilotPrograms.map(p => <option key={p.program_id} value={p.program_id}>{p.name}</option>)}</select></label>{pilotPrograms.length > 0 && <PilotSourceView key={programId} programId={programId} status={runtime} />}</>}
+          {runtime?.mode === 'demo' && <div hidden={view !== 'cockpit'}><CockpitView canWrite={runtime.identity.permission === 'RW'} reviewReady={runtime.review_ready} key={programId} programId={programId} /></div>}
+          {runtime?.mode === 'pilot' && ['semantic','knowledge'].includes(view) && <p className="reader-notice">This capability is unavailable until a pilot semantic and evidence package is approved.</p>}
+          {runtime?.mode === 'demo' && view === 'knowledge' && <KnowledgeCards key={programId} programId={programId} />}
+          {runtime && view === 'models' && <>{runtime.identity.permission === 'RO' && <p className="reader-notice">Workbench RW permission is required to change or test model configuration.</p>}<fieldset disabled={runtime.identity.permission !== 'RW'}><ModelsView /></fieldset></>}
+          {runtime && view === 'nifi' && <NifiView pilot={runtime.mode === 'pilot'} />}
+          {runtime?.mode === 'demo' && view === 'semantic' && <SemanticView key={programId} programId={programId} />}
+          <footer className="workspace-footer"><span>Cloudera AI · Vehicle Manufacturing Blueprint</span><span>{view === 'nifi' ? 'Current snapshots · No operational actions' : 'Code decides · AI narrates'}</span></footer>
         </div>
-      </div>
+      </main>
     </div>
   )
 }

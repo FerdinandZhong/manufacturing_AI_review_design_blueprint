@@ -16,6 +16,37 @@ def test_search_is_deterministic():
     assert a == b
 
 
+def test_external_collection_excludes_fixtures_and_collapses_reused_photo():
+    build_kb()
+    all_hits = search("battery cell published experiment thermal", k=1000)
+    references = [h for h in all_hits if h.get("source_url") and h.get("license_url")]
+    assert len(references) == 8  # Five canonical photos plus three research assets.
+    hits = search("battery cell published experiment thermal", k=30, external_only=True)
+    assert len(hits) == 8
+    assert all(h["source_url"] and h["license_url"] for h in hits)
+    assert sum("BMW_i3" in h["source_url"] for h in hits) == 1
+    assert {h["asset_id"] for h in hits if h["asset_id"].startswith("REF-")} == {
+        "REF-bmw-pack", "REF-leaf-pack", "REF-cylindrical-cell", "REF-leaf-modules", "REF-leaf-cutaway"}
+    assert all(h["program_ref"] == "EXTERNAL-REFERENCE" for h in hits if h["asset_id"].startswith("REF-"))
+    assert search("battery", ontology_filter="TestReport", external_only=True) == []
+
+
+def test_reference_photo_checksums_and_lance_bytes():
+    import hashlib
+    import json
+    from pathlib import Path
+    from PIL import Image
+    import io
+    root = Path(__file__).parents[1] / "data_generation/assets/references"
+    manifest = json.loads((root / "manifest.json").read_text())
+    build_kb()
+    for item in manifest["assets"]:
+        stored = get_asset(item["asset_id"])
+        assert hashlib.sha256(stored["blob"]).hexdigest() == item["sha256"]
+        assert stored["blob"] == (root / item["file"]).read_bytes()
+        assert Image.open(io.BytesIO(stored["blob"])).size == (item["width"], item["height"])
+
+
 # ── injection-crash regression (final review Fix 1) ────────────────────────
 
 def test_search_tautology_filter_returns_no_rows():

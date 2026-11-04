@@ -1,0 +1,45 @@
+Andrey W. Golubkov, René Planteu, Philipp Krohn, Bernhard Rasch, Bernhard Brunnsteiner, Alexander Thaler and Viktor Hacker (2018). Thermal runaway of large automotive Li-ion batteries. RSC Advances. DOI: 10.1039/C8RA06458J. CC BY 3.0.
+
+Source: https://pmc.ncbi.nlm.nih.gov/articles/PMC9091216/
+
+License: https://creativecommons.org/licenses/by/3.0/
+
+Extraction: selected source table and captions; figure files remain unmodified.
+
+Table 1 — Cell specification
+
+Specifications of the tested Li-ion cellsCathodeLiMn2O4 (LMO)AnodeGraphiteMean voltage3.7 VNominal capacity50 A hMaximal current300 ADimensions113.5 mm × 43.8 mm × 171 mmMass1.7 kgSpecific energy109 W h kg−1
+
+Table 2 — Definitions
+
+Results of all experiments. “–” means that the first (minor) venting did not take place. “n.a.” means not available, because associated temperature sensors failed or – in case of experiment 4 – because we forgot to measure the cell mass after the experiment. Here type is the initiation method to start the thermal runaway, Vbeforecell is the cell voltage before the experiment is started, group is the category into which the experiment result was classified, Tcritcell is the temperature at which the hottest cell case sensor exceeds 10° C min−1, Tfailcell is the average cell case temperature at which the cell voltage drops to zero, TV1cell and TV2cell are the average cell case temperatures at which the first and second gas release occurs, Tmaxcell is the maximal cell case temperature during the thermal runaway, TmaxV2 is the maximum vent-gas temperature, nV1 and nV2 are the amounts of released gas during first and second venting, nV is the overall released amount of gas, Treactor is the reactor temperature when nV is measured, ṅchV2 is the characteristic venting rate during the main venting event, Mbeforecell and Maftercell are the cell masses before and after the experiment
+
+Table 2 — Rows (original column order)
+
+No | Type | V before cell V | Group | T crit cell °C | T fail cell °C | T V1 cell °C | T V2 cell °C | T max cell °C | T max V2 °C | n V1 mol | n V2 mol | n V mol | T reactor °C | ṅ ch V2 mol s−1 | M before cell g | M after cell g
+
+1 | Heat ramp | 4.08 | A2 | 248 | 176 | 203 | 247 | 531 | 530 | 0.4 | 2.8 | 3.2 | 61 | 0.9 | 1693 | 1092
+
+2 | Heat ramp | 4.08 | A2 | 251 | 206 | 220 | 270 | 558 | n.a. | 0.3 | 2.7 | 2.9 | 70 | 0.9 | 1695 | 1074
+
+3 | Heat ramp | 4.06 | B1 | 192 | 160 | — | 171 | 518 | 418 | — | 3.1 | 3.1 | 55 | 0.7 | 1695 | 1119
+
+4 | Heat ramp | 4.06 | A2 | 239 | 165 | 194 | 239 | 469 | 488 | 0.3 | 2.7 | 3.1 | 62 | 1.4 | 1691 | n.a.
+
+5 | Heat ramp | 4.10 | B1 | 176 | 154 | — | 155 | 529 | 415 | — | 4.6 | 4.6 | 53 | 0.4 | 1638 | 1101
+
+6 | One-sided heating | 4.08 | B1 | 266 | 221 | — | 221 | 528 | n.a. | — | 3.2 | 3.2 | 58 | 0.6 | 1696 | 1156
+
+7 | One-sided heating | 4.04 | A2 | 281 | 180 | 180 | 203 | 500 | 512 | 0.5 | 2.8 | 3.3 | 43 | 0.6 | 1693 | 1177
+
+8 | Stepwise heating | 4.08 | B2 | 173 | 138 | 167 | 172 | 427 | 405 | 0.4 | 2.9 | 3.4 | 73 | 0.7 | 1696 | 1143
+
+9 | Stepwise heating | 4.10 | A2 | 265 | 154 | 210 | 248 | 530 | 483 | 0.3 | 3.3 | 3.6 | 69 | 0.7 | 1637 | 1063
+
+10 | Reactor heating | 4.08 | A2 | 206 | 140 | 174 | 200 | 495 | 411 | 1.1 | 4.5 | 5.6 | 249 | 1.3 | 1695 | 1115
+
+11 | Reactor heating | 4.08 | A2 | 222 | 155 | 191 | 221 | 595 | n.a. | 1.6 | 4.4 | 5.9 | 253 | 1.4 | 1696 | 1118
+
+Tested cell before and after the thermal runaway experiment. On the fresh cell, the burst-plate of the cell is hidden below the white sticker. After a thermal runaway the cell is heavily damaged: the burst plate is open, the plastic insulation of the terminals is melted and the cell casing is deformed by the pressure inside the cell.
+
+Experiment no. 7 (one sided heating). (left) Temperatures and gas pressure during the whole duration of the experiment and (centre) during the main exothermic event. (right) Amount of released gas into the reactor and temperature rates of the cell case sensors. Here the one-sided heating method created a huge temperature difference between the heated and the non-heated surface of the cell. This divided the cell case temperature sensors into two groups: ones that measured the heated side of the cell and ones that measured the cooler side. Sensors of both groups reached above 400 °C during the thermal runaway of the cell. Both groups are also clearly seen in the rate plot. The thermal runaway started, when the hottest sensor on the heated side of the cell reached 281 °C. The thermal runaway propagated throughout the cell from the hot side to the cooler side. After it reached the cooler side it caused a steep temperature rate increase in the sensors which were only at 120 °C.

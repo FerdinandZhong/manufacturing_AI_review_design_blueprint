@@ -1,0 +1,81 @@
+{
+  "version": 1,
+  "assets": [
+    {
+      "asset_id": "REF-leaf-pack",
+      "file": "leaf-pack.jpg",
+      "title": "Nissan Leaf battery pack \u2014 display photograph",
+      "caption_text": "Battery-pack enclosure and electrical connections in a Nissan Leaf display. Reference for pack architecture; no measured performance or Atlas identity is established.",
+      "author": "Gereon Meyer",
+      "date": "2010-12-08",
+      "source_url": "https://commons.wikimedia.org/wiki/File:Battery-Pack-Leaf.jpg",
+      "download_url": "https://upload.wikimedia.org/wikipedia/commons/6/65/Battery-Pack-Leaf.jpg",
+      "license_url": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "license": "CC BY-SA 4.0",
+      "modifications": "None; original file bytes preserved.",
+      "sha256": "098e77bc03de7a185603d8000c9cc58ec7434f444576454c0b367594d06de7f5",
+      "width": 833,
+      "height": 625,
+      "concepts": [
+        "pack_architecture"
+      ]
+    },
+    {
+      "asset_id": "REF-cylindrical-cell",
+      "file": "cylindrical-cell.jpg",
+      "title": "18650 lithium-ion cell \u2014 before closing",
+      "caption_text": "Cylindrical lithium-ion cell photographed before closing. Reference for cell construction and physical form; not a thermal test or an Atlas component.",
+      "author": "RudolfSimon",
+      "date": "2009-11-22 (upload date)",
+      "source_url": "https://commons.wikimedia.org/wiki/File:Lithium-Ion_Cell_cylindric.JPG",
+      "download_url": "https://upload.wikimedia.org/wikipedia/commons/6/6b/Lithium-Ion_Cell_cylindric.JPG",
+      "license_url": "https://creativecommons.org/licenses/by-sa/3.0/",
+      "license": "CC BY-SA 3.0",
+      "modifications": "None; original file bytes preserved.",
+      "sha256": "87524e946a8c1cfd1029eaa8eeb4d7409d9041c64021709063f5e3bfd3ba6192",
+      "width": 2737,
+      "height": 2532,
+      "concepts": [
+        "cell_construction"
+      ]
+    },
+    {
+      "asset_id": "REF-leaf-modules",
+      "file": "leaf-modules.jpg",
+      "title": "Nissan Leaf battery pack \u2014 module arrangement",
+      "caption_text": "Battery pack photographed at the Leaf Drive Electric Tour in Washington DC. Reference for module arrangement; the photograph does not establish chemistry or safety margins.",
+      "author": "Mario Roberto Duran Ortiz (Mariordo)",
+      "date": "2011-03-20",
+      "source_url": "https://commons.wikimedia.org/wiki/File:Nissan_Leaf_battery_pack_DC_03_2011_1629.jpg",
+      "download_url": "https://upload.wikimedia.org/wikipedia/commons/b/b8/Nissan_Leaf_battery_pack_DC_03_2011_1629.jpg",
+      "license_url": "https://creativecommons.org/licenses/by-sa/3.0/",
+      "license": "CC BY-SA 3.0",
+      "modifications": "None; original file bytes preserved.",
+      "sha256": "75df050e0317c686c56e775fa717100c81e103c068db5dd809a0dbebbfe0243d",
+      "width": 1500,
+      "height": 1000,
+      "concepts": [
+        "pack_architecture"
+      ]
+    },
+    {
+      "asset_id": "REF-leaf-cutaway",
+      "file": "leaf-cutaway.jpg",
+      "title": "2013 Nissan Leaf cutaway \u2014 battery location",
+      "caption_text": "Vehicle cutaway showing the battery-pack location in a 2013 Nissan Leaf. Reference for vehicle integration and packaging; not a photograph of the Atlas program.",
+      "author": "Norsk Elbilforening",
+      "date": "2013-04-08",
+      "source_url": "https://commons.wikimedia.org/wiki/File:2013_Nissan_Leaf_cutaway_%282%29.jpg",
+      "download_url": "https://upload.wikimedia.org/wikipedia/commons/a/ae/2013_Nissan_Leaf_cutaway_%282%29.jpg",
+      "license_url": "https://creativecommons.org/licenses/by/2.0/",
+      "license": "CC BY 2.0",
+      "modifications": "None; original file bytes preserved.",
+      "sha256": "fee623279741b099a0bbb0d5c01dfcbf90a256123c9191186984dc9189bbb94e",
+      "width": 4272,
+      "height": 2848,
+      "concepts": [
+        "pack_architecture"
+      ]
+    }
+  ]
+}

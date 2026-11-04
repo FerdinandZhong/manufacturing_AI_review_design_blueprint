@@ -5,6 +5,8 @@ classes:
   TestReport:      {description: "DVP&R test report / result excerpt", modality: text}
   ComponentPhoto:  {description: "Photo of a physical component/module", modality: image}
   RequirementDoc:  {description: "Source requirement document", modality: text}
+  ResearchFigure: {description: "Original published research figure with a source locator", modality: image}
+  ResearchDocument: {description: "Attributed published source excerpt or document", modality: text}
 relations:
   - {from: DesignImage,    rel: illustrates, to: Requirement}
   - {from: TestReport,     rel: evidences,   to: TestPlan}

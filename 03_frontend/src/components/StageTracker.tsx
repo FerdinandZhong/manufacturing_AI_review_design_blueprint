@@ -24,7 +24,7 @@ export const StageTracker: React.FC<Props> = ({ programId }) => {
   })()
 
   return (
-    <div className="flex items-center gap-2 bg-surface-1 rounded-lg shadow-soft px-4 py-3">
+    <div className="lifecycle-strip">
       {program && (
         <div className="pr-4 border-r border-surface-3 mr-2">
           <p className="text-sm font-semibold text-ink">{program.name}</p>
@@ -38,12 +38,9 @@ export const StageTracker: React.FC<Props> = ({ programId }) => {
           return (
             <span
               key={s}
-              className={`text-2xs font-semibold px-2.5 py-1 rounded-full tracking-wide transition-colors
-                ${active ? 'bg-accent text-white'
-                  : done ? 'bg-accent/10 text-accent'
-                  : 'bg-surface-2 text-ink-faint'}`}
+              className={`lifecycle-step ${active ? 'active' : done ? 'complete' : ''}`}
             >
-              {s.replace('_', ' ')}
+              <span>{i + 1}</span>{s.replace('_', ' ').toLowerCase()}
             </span>
           )
         })}

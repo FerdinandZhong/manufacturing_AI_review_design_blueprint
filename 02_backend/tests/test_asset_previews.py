@@ -19,9 +19,9 @@ def test_assets_are_deterministic_and_real_content():
             svg = ET.fromstring(blob)
             assert int(svg.attrib['width']) >= 800
             assert b'Synthetic demo schematic' in blob
-        elif asset['ontology_class'] == 'ComponentPhoto':
+        elif asset['ontology_class'] in ('ComponentPhoto', 'ResearchFigure'):
             assert blob.startswith(b'\xff\xd8') and len(blob) > 10000
-            assert 'RudolfSimon' in asset['provenance'] and asset['license_url']
+            assert asset['provenance'] and asset['source_url'] and asset['license_url']
         else:
             assert asset['modality'] == 'text' and blob.decode('utf-8')
 
@@ -32,11 +32,11 @@ def test_asset_mime_matches_shipped_content(monkeypatch):
     with TestClient(app) as client:
         for asset in assets.values():
             response = client.get('/api/asset/' + asset['asset_id'])
-            expected = {'DesignImage': 'image/svg+xml', 'ComponentPhoto': 'image/jpeg'}.get(asset['ontology_class'], 'text/plain')
+            expected = {'DesignImage': 'image/svg+xml', 'ComponentPhoto': 'image/jpeg', 'ResearchFigure': 'image/jpeg'}.get(asset['ontology_class'], 'text/plain')
             assert response.headers['content-type'].startswith(expected)
             assert response.content == asset['blob']
 
 
 if __name__ == '__main__':
     test_assets_are_deterministic_and_real_content()
-    assert len(build_assets()) == 10
+    assert len(build_assets()) >= 17

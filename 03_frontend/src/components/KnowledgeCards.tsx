@@ -1,71 +1,45 @@
 import { useEffect, useRef, useState } from 'react'
-import { Search, FileText, ExternalLink } from 'lucide-react'
-import type { KbHit } from '../api'
-import { searchKb, assetUrl } from '../api'
+import { Search, FileText, ExternalLink, Image as ImageIcon, X } from 'lucide-react'
+import type { KbHit, KnowledgeReadiness } from '../api'
+import { searchKb, assetUrl, getKnowledgeReadiness } from '../api'
 
-function Preview({ hit }: { hit: KbHit }) {
-  const [text, setText] = useState('')
-  const [failed, setFailed] = useState(false)
-  useEffect(() => {
-    const controller = new AbortController()
-    if (hit.modality === 'text') fetch(assetUrl(hit.asset_id), { signal: controller.signal }).then(r => {
-      if (!r.ok) throw new Error('Unavailable')
-      return r.text()
-    }).then(setText).catch(e => { if (e.name !== 'AbortError') setFailed(true) })
-    return () => controller.abort()
-  }, [hit.asset_id, hit.modality])
-  if (failed) return <p role="alert" className="p-4 text-sm text-aml-red">Preview unavailable. Try searching again.</p>
-  if (hit.modality === 'image') return <img src={assetUrl(hit.asset_id)} alt={hit.title} onError={() => setFailed(true)} className="w-full max-h-[55vh] object-contain rounded-lg bg-surface-2" />
-  if (hit.modality === 'pdf') return <iframe title={hit.title} src={assetUrl(hit.asset_id)} className="w-full h-96" />
-  return <pre className="whitespace-pre-wrap rounded-lg bg-surface-2 p-5 text-sm leading-relaxed text-ink font-sans">{text || 'Loading document…'}</pre>
-}
-
-export function KnowledgeCards() {
-  const [query, setQuery] = useState('thermal runaway containment design')
-  const [cls, setCls] = useState('')
+export function KnowledgeCards({ programId }: { programId: string }) {
+  const [readiness, setReadiness] = useState<KnowledgeReadiness | null>(null)
+  useEffect(() => { void getKnowledgeReadiness().then(setReadiness).catch(() => setReadiness(null)) }, [])
+  const [kind, setKind] = useState('all')
+  const [query, setQuery] = useState('')
   const [hits, setHits] = useState<KbHit[]>([])
   const [selected, setSelected] = useState<KbHit | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [previewError, setPreviewError] = useState(false)
   const request = useRef(0)
   const dialog = useRef<HTMLDialogElement>(null)
-  const search = async () => {
+  const load = async (text: string) => {
     const id = ++request.current
     setLoading(true); setError('')
-    try { const result = await searchKb(query, cls || undefined, 10); if (id === request.current) setHits(result) }
-    catch { if (id === request.current) setError('Could not load the knowledge base. Please retry.') }
+    try { const results = await searchKb(text.trim() || 'battery', undefined, 20, false, programId, kind); if (id === request.current) setHits(results) }
+    catch { if (id === request.current) setError('The source collection could not be loaded. Retry the search.') }
     finally { if (id === request.current) setLoading(false) }
   }
   useEffect(() => {
     const id = ++request.current
     let active = true
-    searchKb('thermal runaway containment design', undefined, 10)
-      .then(result => { if (active && id === request.current) setHits(result) })
-      .catch(() => { if (active && id === request.current) setError('Could not load the knowledge base. Please retry.') })
-      .finally(() => { if (active && id === request.current) setLoading(false) })
+    searchKb('battery', undefined, 20, false, programId, kind).then(results => { if (active && id === request.current) setHits(results) }).catch(() => { if (active && id === request.current) setError('The source collection could not be loaded. Retry the search.') }).finally(() => { if (active && id === request.current) setLoading(false) })
     return () => { active = false }
-  }, [])
+  }, [programId, kind])
   useEffect(() => { if (selected) dialog.current?.showModal() }, [selected])
-  return <section className="bg-surface-1 rounded-lg shadow-soft p-4 space-y-4">
-    <div><h2 className="font-semibold text-sm text-ink">Knowledge base</h2><p className="text-xs text-ink-muted mt-1">Explore designs, test evidence, and reusable lessons from prior programs.</p></div>
-    <form onSubmit={e => { e.preventDefault(); void search() }} className="space-y-2">
-      <div className="flex gap-2"><label className="flex items-center gap-2 bg-surface-2 rounded-lg px-3 flex-1 min-w-0"><Search size={14} /><input aria-label="Search knowledge base" value={query} onChange={e => setQuery(e.target.value)} className="w-full py-2 text-sm outline-none" /></label><button disabled={loading} className="bg-accent text-white rounded-lg px-3 text-xs font-semibold">{loading ? 'Searching…' : 'Search'}</button></div>
-      <select aria-label="Asset type" value={cls} onChange={e => setCls(e.target.value)} className="text-xs border border-surface-3 rounded-lg p-2 w-full"><option value="">All asset types</option>{['DesignImage', 'TestReport', 'SpecSheet', 'ComponentPhoto', 'RequirementDoc'].map(c => <option key={c}>{c}</option>)}</select>
-    </form>
-    {error && <p role="alert" className="text-sm text-aml-red">{error}</p>}
-    {!loading && !error && !hits.length && <p className="text-sm text-ink-muted">No matching assets. Try another search or asset type.</p>}
-    <div className="space-y-3 max-h-[75vh] overflow-y-auto pr-1">{hits.map(hit => <button key={hit.asset_id} onClick={() => setSelected(hit)} className="w-full text-left rounded-lg border border-surface-3 overflow-hidden hover:border-accent focus-visible:outline-accent">
-      {hit.modality === 'image' && <div className="bg-surface-2 p-2"><img src={assetUrl(hit.asset_id)} alt={hit.title} className="w-full h-44 object-contain" onError={e => { e.currentTarget.style.display = 'none' }} /></div>}
-      <div className="p-3 space-y-2"><div className="flex items-center gap-2 text-xs"><FileText size={14} className="text-accent"/><span className="text-accent font-semibold">{hit.ontology_class}</span><span className="ml-auto text-ink-faint">Similarity {hit.score.toFixed(2)}</span></div><h3 className="font-semibold text-sm text-ink">{hit.title}</h3><p className="text-xs text-ink-muted leading-relaxed">{hit.caption_text}</p><p className="text-xs font-mono text-ink-faint break-all">{hit.program_ref} · {hit.linked_entity_id}</p><span className="inline-block text-xs font-semibold text-accent">Open asset & details →</span></div>
-    </button>)}</div>
-    <dialog ref={dialog} onClose={() => setSelected(null)} onClick={e => { if (e.target === e.currentTarget) dialog.current?.close() }} className="m-auto w-[min(1000px,94vw)] max-h-[90vh] overflow-y-auto rounded-xl p-6 bg-surface-1 text-ink backdrop:bg-header/60">
-      {selected && <div className="space-y-4"><div className="flex items-start justify-between gap-4"><div><p className="text-xs text-accent font-semibold">{selected.ontology_class} · {selected.modality}</p><h2 className="text-xl font-bold mt-1">{selected.title}</h2></div><button autoFocus onClick={() => dialog.current?.close()} className="px-3 py-2 rounded-lg bg-surface-2 text-sm">Close</button></div>
-        <Preview key={selected.asset_id} hit={selected} />
-        <p className="text-sm leading-relaxed">{selected.caption_text}</p>
-        <dl className="grid sm:grid-cols-2 gap-4 text-sm"><div><dt className="text-ink-muted">Program</dt><dd>{selected.program_ref}</dd></div><div><dt className="text-ink-muted">Linked {selected.linked_entity_type}</dt><dd className="font-mono break-all">{selected.linked_entity_id}</dd></div><div><dt className="text-ink-muted">Asset ID</dt><dd className="font-mono break-all">{selected.asset_id}</dd></div><div><dt className="text-ink-muted">Search similarity</dt><dd>{selected.score.toFixed(2)} · retrieval relevance, not engineering confidence</dd></div></dl>
-        <div className="bg-surface-2 rounded-lg p-4 text-sm space-y-2"><h3 className="font-semibold">How to use this evidence</h3><p>{selected.ontology_class === 'DesignImage' ? 'Inspect the barrier and cooling layout, then compare the linked thermal test report before proposing a design change.' : selected.ontology_class === 'TestReport' ? 'Compare the historical test outcome with the current requirement and test result. Reuse the lesson as review context, not as validation of the new pack.' : 'Use this reference to understand the linked component, design specification, or requirement. Validate applicability to the current program.'}</p><p className="text-ink-muted">{selected.provenance || 'Synthetic demo artifact; not production engineering evidence.'}</p>{selected.source_url && <a className="text-accent underline mr-4" href={selected.source_url} target="_blank" rel="noreferrer">Original source</a>}{selected.license_url && <a className="text-accent underline" href={selected.license_url} target="_blank" rel="noreferrer">CC BY-SA 3.0 license</a>}</div>
-        <a href={assetUrl(selected.asset_id)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-sm text-accent font-semibold"><ExternalLink size={16}/>Open original asset</a>
-      </div>}
-    </dialog>
+  const open = (hit: KbHit) => { setSelected(hit); setPreviewError(false) }
+  const title = (hit: KbHit) => hit.source_url?.includes('BMW_i3') ? 'BMW i3 battery pack — original reference photograph' : hit.title
+  return <section className="knowledge-library">
+    <div className="library-summary"><div><strong>Source collection</strong><p>Generated direct evidence, historical demo evidence, and attributed external references.</p></div><span className="context-chip">{loading ? 'Loading…' : `${hits.length} ${hits.length === 1 ? 'source' : 'sources'}`}</span></div>
+    <label className="context-chip">Evidence type <select aria-label="Evidence type" value={kind} onChange={e => setKind(e.target.value)}><option value="all">All evidence</option><option value="direct_demo">Program evidence</option><option value="external_reference">External references</option><option value="historical_demo">Historical evidence</option></select></label>
+    <form onSubmit={e => { e.preventDefault(); void load(query) }} className="library-search"><Search size={16} /><input aria-label="Search knowledge base" value={query} onChange={e => setQuery(e.target.value)} placeholder="Search the source collection…" /><button className="primary-button" disabled={loading}>Search</button></form>
+    <p className="library-scope">Evidence is scoped to the selected revision. Direct demo evidence uses seeded observations; external sources provide reference context.</p>
+    {readiness && <p className="library-scope">Index: {readiness.index.state}. Retrieval: lexical + offline token hash. Image similarity: {readiness.image_similarity.state}. OCR: unverified, cache replay only; paid extraction requires a separate build command.</p>}
+    {error && <p role="alert" className="reader-notice reader-error">{error}</p>}
+    {!loading && !error && !hits.length && <div className="library-empty"><FileText size={24} /><h2>No source material found</h2><p>Try another query or evidence type.</p></div>}
+    <div className="library-items">{hits.map(hit => <article key={hit.asset_id} className="library-item"><button className="library-thumbnail" onClick={() => open(hit)} aria-label={`Preview ${title(hit)}`}>{hit.modality === 'image' ? <img src={assetUrl(hit.asset_id)} alt={title(hit)} onError={e => { e.currentTarget.hidden = true }} /> : <FileText size={32} />}</button><div className="library-item-body"><div className="library-meta"><span>{hit.modality === 'image' ? <ImageIcon size={13} /> : <FileText size={13} />}{hit.modality === 'image' ? 'Photograph / image' : hit.modality.toUpperCase()}</span><span>{hit.evidence_kind?.replaceAll('_', ' ') || 'External reference'}</span></div><button onClick={() => open(hit)} className="library-title">{title(hit)}</button><p>{hit.caption_text}</p><small>{hit.provenance}</small>{!!hit.retrieval?.chunks.length && <details><summary>Matched source text</summary>{hit.retrieval.chunks.map(chunk => <p key={chunk.chunk_id}><strong>Page {chunk.page} · {chunk.section}</strong><br />{chunk.text}<br /><small>{chunk.extraction_method} · {chunk.verification} · SHA-256 {chunk.source_sha256.slice(0, 12)}</small></p>)}</details>}<div className="library-links"><button onClick={() => open(hit)}>Open preview</button>{hit.source_url && <a href={hit.source_url} target="_blank" rel="noreferrer">Original source <ExternalLink size={12} /></a>}{hit.license_url && <a href={hit.license_url} target="_blank" rel="noreferrer">License <ExternalLink size={12} /></a>}</div></div></article>)}</div>
+    <dialog ref={dialog} onClose={() => setSelected(null)} onClick={e => { if (e.target === e.currentTarget) dialog.current?.close() }} className="semantic-dialog">{selected && <><header><div><p className="eyebrow">{selected.evidence_kind?.replaceAll('_', ' ') || 'EXTERNAL REFERENCE'}</p><h2>{title(selected)}</h2></div><button autoFocus className="quiet-button" onClick={() => dialog.current?.close()} aria-label="Close source preview"><X size={16} /></button></header>{previewError ? <p role="alert">Preview unavailable. Open the original source below.</p> : selected.modality === 'image' ? <img src={assetUrl(selected.asset_id)} alt={title(selected)} onError={() => setPreviewError(true)} /> : <iframe src={assetUrl(selected.asset_id)} title={title(selected)} />}<p>{selected.caption_text}</p><p className="reader-caption">{selected.provenance}</p><p className="reader-notice">{selected.source_url ? 'External reference material cannot establish Atlas performance or compliance.' : 'Generated demo evidence reproduces seeded engineering records for the displayed program revision.'}</p>{selected.source_url && <a href={selected.source_url} target="_blank" rel="noreferrer" className="text-accent underline">Open original source</a>}</>}</dialog>
   </section>
 }

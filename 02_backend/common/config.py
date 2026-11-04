@@ -41,7 +41,15 @@ def _resolve_workspace_domain(cfg: dict) -> None:
 
 def get_db_path() -> str:
     cfg = get_config()
-    raw = cfg.get("data", {}).get("db_path", "data/npi.db")
+    from common.runtime import data_mode
+    raw = (cfg.get('pilot', {}).get('ops_db_path', 'data/pilot/npi.db') if data_mode()=='pilot'
+           else cfg.get("data", {}).get("db_path", "data/npi.db"))
+    if data_mode()=='pilot':
+        from pathlib import Path
+        demo = cfg.get('data',{}).get('db_path','data/npi.db')
+        resolved = lambda value: (Path(value) if Path(value).is_absolute() else Path(PROJECT_ROOT)/value).resolve()
+        if resolved(raw)==resolved(demo):
+            raise RuntimeError('Pilot operations storage must differ from Demo storage')
     if os.path.isabs(raw):
         return raw
     return os.path.join(PROJECT_ROOT, raw)

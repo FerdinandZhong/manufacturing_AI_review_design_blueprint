@@ -103,3 +103,27 @@ configured application origin; it is not a substitute for Workbench SSO and is
 never the API v2 deployment key. Tool errors intentionally omit tokens and
 upstream response bodies. HTTP 401/403 errors explicitly distinguish a missing
 token from a rejected one without exposing the token value.
+
+## Private Workbench authentication
+
+Use the private Application URL as `NPI_API_BASE_URL`, including `/api`.
+Create a Workbench API key with the **Application** audience.
+Set `NPI_API_BEARER_TOKEN` in the MCP host's secret environment.
+The adapter sends `Authorization: Bearer <key>` to the Application ingress.
+It never forwards native identity headers or calls the loopback backend directly.
+A CAI Inferencing JWT, `/tmp/jwt`, and an API-v2-only key are not substitutes.
+The legacy `NPI_API_TOKEN` name remains a compatibility alias for the same Application key.
+
+Workbench validates the key and injects its native identity and permission.
+RO users can inspect records. RW permission is required to trigger persisted reviews.
+The application records the trusted actor; MCP cannot supply or elevate that actor.
+A 401/403 or SSO redirect is an authentication/configuration failure, not an empty result.
+Browser requests also require same-origin mutation checks. Adding an arbitrary Bearer header cannot bypass a conflicting Origin.
+
+Pilot mode exposes only validated read-only imports at this milestone.
+Pilot review, synthetic risk, demo knowledge, and demo semantic tools remain unavailable.
+Remote key validation, native-header sanitization, and deployed participant permissions remain acceptance checks.
+
+Official references: [Application security](https://docs.cloudera.com/machine-learning/cloud/applications/topics/ml-securing-applications.html), [API keys and Application audience](https://docs.cloudera.com/machine-learning/cloud/api/topics/ml-api-v2.html).
+
+MCP tests are an explicit development/release check: `python -m pytest mcp_server/tests -q`. Operational preparation installs the adapter but never runs its demo integration fixtures under Pilot mode. Run release tests only in an isolated local Demo test environment.

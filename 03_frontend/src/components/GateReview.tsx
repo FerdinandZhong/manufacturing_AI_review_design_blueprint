@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { WorkflowGraph, type WorkflowNode } from './WorkflowGraph'
 import { PlayCircle } from 'lucide-react'
-import type { PipelineItem } from './PipelineStream'
-import { PipelineStream } from './PipelineStream'
+import type { PipelineItem, WorkerAssessment } from './PipelineStream'
+import { PipelineStream, Md } from './PipelineStream'
 import { streamReview } from '../api'
 
 const PHASES = ['COLLECTING', 'ANALYZING']
@@ -21,11 +21,12 @@ const REC_CLS: Record<string, string> = {
 }
 
 interface Props {
+  canWrite?: boolean
   programId: string
   onReviewDone: (reviewId: string | null) => void
 }
 
-export const GateReview: React.FC<Props> = ({ programId, onReviewDone }) => {
+export const GateReview: React.FC<Props> = ({ programId, onReviewDone, canWrite = true }) => {
   const [error, setError] = useState('')
   const [started, setStarted] = useState<string[]>([])
   const [running, setRunning] = useState(false)
@@ -59,7 +60,7 @@ export const GateReview: React.FC<Props> = ({ programId, onReviewDone }) => {
       } else if (type === 'worker_done') {
         const worker = evt.worker as string
         setItems(prev => prev.map(it => it.key === worker
-          ? { ...it, status: 'ok', detail: evt.findings as string, chips: evt.evidence_ids as string[] }
+          ? { ...it, status: 'ok', detail: evt.findings as string, chips: evt.evidence_ids as string[], assessment: evt.assessment as WorkerAssessment | undefined }
           : it))
       } else if (type === 'recommendation') {
         setRecommendation(evt.value as string)
@@ -97,7 +98,7 @@ export const GateReview: React.FC<Props> = ({ programId, onReviewDone }) => {
           )}
           <button
             onClick={run}
-            disabled={running}
+            disabled={running || !canWrite}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold
               bg-accent text-white hover:bg-accent-dim disabled:opacity-50 transition-colors"
           >
@@ -107,17 +108,27 @@ export const GateReview: React.FC<Props> = ({ programId, onReviewDone }) => {
         </div>
       </div>
 
-      <WorkflowGraph nodes={nodes} running={running} />
+      <details className="workflow-disclosure"><summary>Agent workflow · {nodes.filter(n => n.status === 'completed').length}/8 steps complete</summary><WorkflowGraph nodes={nodes} running={running} /></details>
       {error && <p role="alert" className="text-sm text-aml-red">{error}</p>}
+      {narrative && <section className="gate-result-report" aria-label="Gate review summary">
+        <header><h3>Gate review summary</h3><span>Computed from reviewed evidence</span></header>
+        <div className="gate-score-overview">{items.map(item => {
+          const a = item.assessment
+          if (!a) return null
+          return <div key={item.key}><span>{a.kind === 'model_risk' ? 'Highest model risk score' : 'Top retrieval relevance'}</span><strong>{a.kind === 'model_risk' ? (a.score == null ? 'Unavailable' : `${(a.score * 100).toFixed(1)}%`) : (a.hits.length ? `${a.hits[0].score.toFixed(3)} / 1` : 'No matches')}</strong><small>{a.kind === 'model_risk' ? 'Uncalibrated predicted risk' : 'Query match, not evidence accuracy'}</small></div>
+        })}</div>
+        <Md text={narrative} running={running} />
+      </section>}
+      <details className="gate-supporting-findings" open={running || !reviewId}>
+        <summary>Supporting findings and score details · {items.filter(item => item.status === 'ok').length}/5 workers complete</summary>
       <PipelineStream
         phases={PHASES}
         activePhase={activePhase}
         items={items}
-        narrative={narrative}
-        narrativeTitle="Gate review narrative"
         running={running}
         idle={<span>No gate review run yet. Click "Run Gate Review" to start.</span>}
       />
+      </details>
 
       {reviewId && !running && (
         <p className="text-2xs text-ink-faint">review_id: <span className="font-mono">{reviewId}</span></p>

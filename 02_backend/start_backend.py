@@ -16,7 +16,7 @@ HOST = "127.0.0.1"
 
 if __name__ == "__main__":
     print(f"Starting Vehicle NPI backend on {HOST}:{PORT}")
-    uvicorn.run("api.main:app", host=HOST, port=PORT, reload=False, app_dir=os.path.join(PROJECT_ROOT, "02_backend"))
+    uvicorn.run("api.main:app", host=HOST, port=PORT, reload=False, proxy_headers=False, app_dir=os.path.join(PROJECT_ROOT, "02_backend"))
 else:
     print(f"Starting Vehicle NPI backend on {HOST}:{PORT}")
-    uvicorn.run("api.main:app", host=HOST, port=PORT, reload=False, app_dir=os.path.join(PROJECT_ROOT, "02_backend"))
+    uvicorn.run("api.main:app", host=HOST, port=PORT, reload=False, proxy_headers=False, app_dir=os.path.join(PROJECT_ROOT, "02_backend"))

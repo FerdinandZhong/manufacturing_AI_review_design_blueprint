@@ -1,15 +1,7 @@
-"""Multimodal knowledge base (Task 7) — Lance-backed store of ontology-validated
-assets (images/pdfs/text) with precomputed embeddings for semantic search.
+"""Lance asset store with pinned offline embeddings and attributable source chunks.
 
-Two-store rule: this is a third, separate store (data/kb/assets.lance) —
-distinct from common/db.py's ops SQLite and common/source.py's CSV source.
-
-Embedding: embed(text) tries sentence-transformers MiniLM first (only useful
-if the model is already cached offline — see module docstring note below on
-why the fallback is what actually runs here), and falls back to a
-deterministic 128-dim token-hash bag, L2-normalized (_hash_embed). The ST
-attempt is wrapped in try/except so embed() never hard-fails regardless of
-network state; determinism is guaranteed by the hashing fallback.
+Build-time extraction preserves original bytes. Runtime search uses lexical and
+vector scores after scope filtering. No model discovery or paid extraction occurs.
 """
 import sys, os
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -25,33 +17,37 @@ from knowledge import ontology
 from common.config import get_config, PROJECT_ROOT as CFG_PROJECT_ROOT
 
 HASH_DIM = 128
+STOPWORDS = frozenset('a an the is are was were be been being of for to in on at by with and or as it this that these those has have from does do not'.split())
 
-_st_model = None
-_st_unavailable = False
+
+def _tokens(text):
+    return set(re.findall(r"\w+", text.lower())) - STOPWORDS
+
+
+EMBEDDING_CONTRACT = {"version": "token-hash-v2", "model": "sha256-token-bag", "dimension": HASH_DIM,
+                      "tokenizer": "unicode-word-lower-v1", "normalization": "l2", "dtype": "float32"}
+
+
+class IncompatibleIndex(RuntimeError):
+    """The stored vectors cannot be compared with this query encoder."""
 
 
 def _try_load_st():
-    """Attempt to load sentence-transformers MiniLM from local/offline cache
-    only (HF_HUB_OFFLINE=1) so this never blocks on a network call. Cached
-    once per process; on any failure, remember it and never retry."""
-    global _st_model, _st_unavailable
-    if _st_model is not None or _st_unavailable:
-        return _st_model
-    try:
-        os.environ.setdefault("HF_HUB_OFFLINE", "1")
-        os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
-        from sentence_transformers import SentenceTransformer
-        _st_model = SentenceTransformer("all-MiniLM-L6-v2")
-    except Exception:
-        _st_unavailable = True
-        _st_model = None
-    return _st_model
+    """Compatibility hook. Automatic model discovery is deliberately disabled."""
+    return None
+
+
+def embedding_contract():
+    configured = get_config().get('knowledge', {}).get('embedding', {})
+    if configured and configured != EMBEDDING_CONTRACT:
+        raise IncompatibleIndex('Unsupported embedding contract. Use token-hash-v2 and rebuild with prepare.py.')
+    return dict(EMBEDDING_CONTRACT)
 
 
 def _hash_embed(text: str, dim: int = HASH_DIM) -> np.ndarray:
     """Deterministic token-hash bag-of-words embedding, L2-normalized."""
     vec = np.zeros(dim, dtype=np.float32)
-    for tok in (text or "").lower().split():
+    for tok in re.findall(r"\w+", (text or "").lower()):
         h = int(hashlib.sha256(tok.encode("utf-8")).hexdigest(), 16)
         vec[h % dim] += 1.0
     norm = np.linalg.norm(vec)
@@ -59,16 +55,8 @@ def _hash_embed(text: str, dim: int = HASH_DIM) -> np.ndarray:
 
 
 def embed(text: str) -> np.ndarray:
-    """Same function used at build time (asset captions) and query time (the
-    search string) — this is what makes vector search apples-to-apples."""
-    model = _try_load_st()
-    if model is not None:
-        try:
-            v = np.asarray(model.encode([text], convert_to_numpy=True)[0], dtype=np.float32)
-            norm = np.linalg.norm(v)
-            return v / norm if norm > 0 else v
-        except Exception:
-            pass  # fall through to the deterministic hash embedding
+    """Use the explicitly versioned offline encoder; never switch models."""
+    embedding_contract()
     return _hash_embed(text)
 
 
@@ -83,13 +71,20 @@ def _kb_path() -> str:
 def build_kb() -> int:
     """Validates every seeded asset against the ontology, embeds each asset's
     caption, and (re)writes the Lance dataset. Returns the row count."""
+    from common.runtime import require_demo
+    require_demo('Demo knowledge build')
     from data_generation.generate_assets import build_assets
 
     assets = build_assets()
     for a in assets:
         assert ontology.validate_asset(a), f"invalid ontology_class: {a.get('ontology_class')}"
 
-    embeddings = [embed(a["caption_text"]) for a in assets]
+    from knowledge.documents import extract_document
+    import json
+    for asset in assets:
+        asset['extraction'] = extract_document(asset)
+        asset['chunks'] = asset['extraction']['chunks']
+    embeddings = [embed(' '.join([a['title'], a['caption_text']] + [c['text'] for c in a['chunks']])) for a in assets]
     dim = len(embeddings[0])
     assert all(len(e) == dim for e in embeddings), "embedding dim mismatch across assets"
 
@@ -105,6 +100,10 @@ def build_kb() -> int:
         "linked_entity_id": pa.array([a["linked_entity_id"] for a in assets], type=pa.string()),
         **{key: pa.array([a[key] for a in assets], type=pa.string())
            for key in ("provenance", "source_url", "license_url")},
+        **{key: pa.array([a.get(key, '') for a in assets], type=pa.string()) for key in ('evidence_kind','snapshot_id')},
+        "extraction_json": pa.array([json.dumps({k:v for k,v in a['extraction'].items() if k!='chunks'}, sort_keys=True) for a in assets], type=pa.string()),
+        "chunks_json": pa.array([json.dumps(a['chunks'], sort_keys=True) for a in assets], type=pa.string()),
+        "embedding_contract": pa.array([json.dumps(embedding_contract(), sort_keys=True)] * len(assets), type=pa.string()),
         "embedding": pa.array([e.tolist() for e in embeddings], type=pa.list_(pa.float32(), dim)),
     })
 
@@ -118,15 +117,27 @@ def _open() -> "lance.LanceDataset":
     path = _kb_path()
     if not os.path.exists(path):
         raise RuntimeError(f"KB not found at {path}. Run build_kb() first.")
-    return lance.dataset(path)
+    import json
+    ds = lance.dataset(path)
+    if 'embedding_contract' not in ds.schema.names:
+        raise IncompatibleIndex('Knowledge index has no embedding contract. Run prepare.py to rebuild it.')
+    contracts = ds.to_table(columns=['embedding_contract']).column(0).to_pylist()
+    expected = json.dumps(embedding_contract(), sort_keys=True)
+    if any(c != expected for c in contracts) or ds.schema.field('embedding').type.list_size != HASH_DIM:
+        raise IncompatibleIndex('Knowledge index embedding contract differs. Run prepare.py to rebuild it.')
+    return ds
 
 
-def search(query: str, ontology_filter: str | None = None, k: int = 5) -> list[dict]:
+def search(query: str, ontology_filter: str | None = None, k: int = 5, external_only: bool = False, program_id: str | None = None, evidence_kind: str = "all", requirement_ids: list[str] | None = None) -> list[dict]:
     """Brute-force cosine similarity over the (small, ~10-row) embedding
     column — simpler and more deterministic than building an ANN index at
     this scale. Sorted by score desc with a stable asset_id tiebreak.
     ponytail: brute-force cosine, add a Lance vector index only if N grows
     past a few thousand rows."""
+    import json
+    query_tokens = _tokens(query)
+    if not query_tokens or k <= 0:
+        return []
     if ontology_filter is not None and ontology_filter not in ontology.classes():
         # Unknown class legitimately has zero matches — safe to short-circuit
         # instead of string-interpolating an unvalidated value into the
@@ -135,6 +146,19 @@ def search(query: str, ontology_filter: str | None = None, k: int = 5) -> list[d
     ds = _open()
     filt = f"ontology_class = '{ontology_filter}'" if ontology_filter else None
     rows = ds.to_table(filter=filt).to_pylist()
+    if program_id:
+        from knowledge.asset_registry import scoped_assets
+        rows = scoped_assets(rows, program_id, evidence_kind, len(rows))
+    if requirement_ids is not None:
+        rows = [r for r in rows if r.get('source_url') or r.get('linked_entity_id') in requirement_ids]
+    if external_only:
+        # Exclude generated fixtures and collapse reused copies of one source asset.
+        unique = {}
+        for row in sorted(rows, key=lambda r: r['asset_id']):
+            if row.get('source_url') and row.get('license_url'):
+                identity = (row['source_url'], hashlib.sha256(row['blob']).hexdigest())
+                unique.setdefault(identity, row)
+        rows = list(unique.values())
     if not rows:
         return []
 
@@ -143,11 +167,26 @@ def search(query: str, ontology_filter: str | None = None, k: int = 5) -> list[d
     qnorm = np.linalg.norm(qvec)
     row_norms = np.linalg.norm(mat, axis=1)
     denom = row_norms * qnorm
-    scores = np.where(denom > 0, mat @ qvec / np.where(denom > 0, denom, 1.0), 0.0)
+    scores = np.where(denom > 0, np.sum(mat * qvec, axis=1) / np.where(denom > 0, denom, 1.0), 0.0)
 
     hits = []
     for r, score in zip(rows, scores):
-        h = {kk: v for kk, v in r.items() if kk != "embedding"}
+        chunks = json.loads(r['chunks_json'])
+        searchable = ' '.join([r['title'], r['caption_text']] + [c['text'] for c in chunks])
+        tokens = _tokens(searchable)
+        overlap = query_tokens & tokens
+        # Hash collisions alone cannot establish relevance.
+        if not overlap:
+            continue
+        lexical = len(overlap) / len(query_tokens)
+        vector_score = max(0.0, float(score))
+        score = 0.7 * lexical + 0.3 * vector_score
+        matching = sorted([c for c in chunks if query_tokens & _tokens(c['text'])],
+                          key=lambda c: (-len(query_tokens & _tokens(c['text'])), c['chunk_id']))
+        h = {kk: v for kk, v in r.items() if kk not in {"embedding", "chunks_json", "embedding_contract", "extraction_json"}}
+        h['retrieval'] = {'method':'hybrid-lexical-token-hash-v1', 'lexical_score':lexical, 'vector_score':vector_score,
+                          'matched_terms':sorted(overlap), 'chunks':matching[:3], 'support':'extracted source text' if matching else 'metadata only; no matching extracted source text', 'embedding_contract':embedding_contract()}
+        h['extraction'] = json.loads(r['extraction_json'])
         h["score"] = float(score)
         hits.append(h)
     hits.sort(key=lambda h: (-h["score"], h["asset_id"]))
@@ -169,19 +208,18 @@ def get_asset(asset_id: str) -> dict:
         raise KeyError(f"asset not found: {asset_id}")
     row = rows[0]
     row.pop("embedding", None)
+    import json
+    row['extraction'] = json.loads(row.pop('extraction_json'))
+    row['chunks'] = json.loads(row.pop('chunks_json'))
+    row['embedding_contract'] = json.loads(row['embedding_contract'])
+    if row.get('snapshot_id'):
+        from common import source
+        if row['snapshot_id'] != source.snapshot_identity(row['program_ref'])['snapshot_id']:
+            raise ValueError('Asset snapshot is stale. Run prepare.py to rebuild the knowledge base.')
     return row
 
 
 if __name__ == "__main__":
-    n = build_kb()
-    assert n >= 8, n
-    hits = search("thermal runaway containment design", k=3)
-    assert hits and any("thermal" in (h.get("linked_entity_id") or "") for h in hits), hits
-    top = hits[0]
-    a = get_asset(top["asset_id"])
-    assert a["blob"] and a["modality"] in {"image", "pdf", "text"}
-    a2 = [h["asset_id"] for h in search("thermal", k=3)]
-    b2 = [h["asset_id"] for h in search("thermal", k=3)]
-    assert a2 == b2, (a2, b2)
-    print(f"kb OK — {n} assets, top hit for 'thermal runaway containment design' = {top['asset_id']} "
-          f"(score={top['score']:.3f}, linked={top['linked_entity_id']})")
+    assert embed('thermal').shape == (HASH_DIM,)
+    assert np.array_equal(embed('thermal'), embed('thermal'))
+    assert search('!!!') == []

@@ -24,7 +24,10 @@ def build_payload(runtime, subdomain='vehicle-npi-platform'):
             'script': SCRIPT, 'subdomain': subdomain, 'runtime_identifier': runtime,
             'cpu': 2, 'memory': 8, 'bypass_authentication': False,
             'environment': {'BACKEND_PORT': '7078', 'NPI_APP_MODE': 'prod',
-                            'LLM_PROVIDER': os.getenv('LLM_PROVIDER', 'caii')}}
+                            'LLM_PROVIDER': os.getenv('LLM_PROVIDER', 'caii'),
+                            'NPI_AUTH_MODE':'workbench',
+                            'NPI_DATA_MODE':os.getenv('NPI_DATA_MODE','demo'),
+                            **{k:os.environ[k] for k in ('NPI_PUBLIC_ORIGIN','NPI_TRUSTED_PROXY_CIDRS','NPI_SOURCE_PROVIDER','NPI_PILOT_SOURCE') if os.getenv(k)}}}
 
 
 def deploy(client, project_id, payload, timeout=600):

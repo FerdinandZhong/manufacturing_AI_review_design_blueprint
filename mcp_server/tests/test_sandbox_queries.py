@@ -18,6 +18,10 @@ sys.path.insert(0, str(ROOT / '02_backend'))
 
 def test_sandbox_queries(tmp_path, monkeypatch):
     from common import db
+    from common.config import get_config
+    from knowledge import kb
+    monkeypatch.setitem(get_config()['data'], 'kb_dir', str(tmp_path/'kb'))
+    kb.build_kb()
     from engineering.test_bench import run_test_bench
     from api.main import app
     monkeypatch.setattr(db, 'get_db_path', lambda: str(tmp_path / 'ops.db'))
@@ -58,7 +62,7 @@ def test_sandbox_queries(tmp_path, monkeypatch):
                     search = await session.call_tool('search_knowledge', {'query': 'thermal'})
                     assert not search.isError and 'AST-' in str(search)
                     for asset, content_type in [('AST-ATLAS-thermal-report', 'text'),
-                                                ('AST-ATLAS-pack-photo', 'image')]:
+                                                ('REF-bmw-pack', 'image')]:
                         content = await session.call_tool('read_knowledge_content', {'asset_id': asset})
                         assert not content.isError, content
                         assert any(c.type == content_type for c in content.content)

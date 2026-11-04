@@ -28,7 +28,26 @@ def offline(*args, **kwargs):
 
 
 def main():
+    from common.runtime import data_mode
+    if data_mode()=='pilot':
+        from common import providers
+        assert providers.readiness()['state']=='ready', 'Pilot source is unready; no Demo fallback'
+        print('Pilot contract smoke passed. Remote Workbench access acceptance remains pending.')
+        return
     assert (ROOT / '03_frontend/dist/index.html').is_file(), 'Build the frontend first'
+    from common.runtime import auth_mode
+    from common.security import sign
+    import secrets
+    previous_secret = os.environ.get('NPI_INGRESS_SECRET')
+    previous_origin = os.environ.get('NPI_PUBLIC_ORIGIN')
+    if auth_mode()=='workbench':
+        os.environ['NPI_INGRESS_SECRET'] = secrets.token_urlsafe(48)
+        os.environ.setdefault('NPI_PUBLIC_ORIGIN','https://offline-smoke.invalid')
+    def mock_identity(request):
+        if auth_mode()=='workbench':
+            actor, permission, kind = 'offline-smoke-fixture','RW','machine'
+            path = request.url.path + ('?'+request.url.query.decode() if request.url.query else '')
+            request.headers.update({'x-npi-actor':actor,'x-npi-permission':permission,'x-npi-auth-kind':kind,'x-npi-proof':sign(os.environ['NPI_INGRESS_SECRET'],actor,permission,kind,request.method,path,'')})
     previous = db.get_db_path
     worker_chat, narrative_chat = workers.chat, narrative.chat
     try:
@@ -38,7 +57,8 @@ def main():
             workers.chat = narrative.chat = offline
             run_test_bench('PACK-ATLAS-01')
             score_program('PACK-ATLAS-01')
-            with TestClient(app) as client:
+            with TestClient(app,client=('127.0.0.1',50000)) as client:
+                client.event_hooks['request']=[mock_identity]
                 assert client.get('/api/health').json()['status'] == 'ok'
                 risk = client.get('/api/programs/PACK-ATLAS-01/risk').json()
                 assert any(r['risk_band'] == 'HIGH' and 'thermal' in r['entity_id'] for r in risk['scores'])
@@ -53,6 +73,11 @@ def main():
                 assert sum(e['type'] == 'worker_done' for e in events) == 5
                 assert [e['value'] for e in events if e['type'] == 'recommendation'] == ['CONDITIONAL']
     finally:
+        for name,value in [('NPI_INGRESS_SECRET',previous_secret),('NPI_PUBLIC_ORIGIN',previous_origin)]:
+            if value is None:
+                os.environ.pop(name,None)
+            else:
+                os.environ[name]=value
         db.get_db_path = previous
         workers.chat, narrative.chat = worker_chat, narrative_chat
     print('NPI smoke OK: HIGH risk, assets, 5 workers, CONDITIONAL, done')

@@ -1,13 +1,35 @@
 """Deterministic multimodal seed assets, built into Lance by build_kb().
 
-Original SVG schematics, text excerpts, and a bundled attributed reference
-photograph. No network access, timestamps, or runtime source writes.
+Original SVG schematics, synthetic text excerpts, attributed photographs,
+and a pinned published research package. No network access, timestamps, or runtime source writes.
 """
 import sys, os
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.join(PROJECT_ROOT, "02_backend"))
 
 from pathlib import Path
+import hashlib
+import json
+
+
+def reference_photos() -> list[dict]:
+    """Load pinned original photographs without network access or invented NPI links."""
+    root = Path(__file__).parent / "assets/references"
+    manifest = json.loads((root / "manifest.json").read_text())
+    assets = []
+    for item in manifest["assets"]:
+        blob = (root / item["file"]).read_bytes()
+        if hashlib.sha256(blob).hexdigest() != item["sha256"]:
+            raise ValueError(f"Reference checksum mismatch: {item['asset_id']}")
+        assets.append({
+            "asset_id": item["asset_id"], "ontology_class": "ComponentPhoto", "modality": "image",
+            "title": item["title"], "caption_text": item["caption_text"], "blob": blob,
+            "program_ref": "EXTERNAL-REFERENCE", "linked_entity_type": "ReferenceConcept",
+            "linked_entity_id": item["concepts"][0],
+            "provenance": f"{item['author']} · {item['date']} · {item['license']} · {item['modifications']}",
+            "source_url": item["source_url"], "license_url": item["license_url"],
+        })
+    return assets
 
 
 def _thermal_diagram(program: str) -> bytes:
@@ -35,6 +57,8 @@ def build_assets() -> list[dict]:
     across the three seeded programs. Includes a PACK-ORION-00 DesignImage +
     TestReport pair linked to REQ-ORION-thermal (the historical-reuse hit the
     KB search test targets)."""
+    from common.runtime import require_demo
+    require_demo('Synthetic artifact generation')
     assets = [
         {
             "asset_id": "AST-ORION-thermal-design", "ontology_class": "DesignImage", "modality": "image",
@@ -156,7 +180,13 @@ def build_assets() -> list[dict]:
             asset["provenance"] = "RudolfSimon · November 2012 · CC BY-SA 3.0 · original photograph, unmodified. Used as an illustrative reference for this synthetic program."
             asset["source_url"] = "https://commons.wikimedia.org/wiki/File:Lithium-Ion_Battery_for_BMW_i3_-_Battery_Pack.JPG"
             asset["license_url"] = "https://creativecommons.org/licenses/by-sa/3.0/"
-    return assets
+    from knowledge.semantic import reference_assets, photo_assets, asset_path
+    from knowledge.asset_registry import generated_reports
+    # One canonical original photograph replaces two program-specific copies.
+    assets = [a for a in assets if a['ontology_class'] != 'ComponentPhoto' and a['asset_id'] not in {'AST-ATLAS-thermal-report','AST-ORION-thermal-report'}]
+    bmw = next(a for a in photo_assets() if a['id']=='REF-bmw-pack')
+    assets.append(dict(asset_id=bmw['id'], ontology_class='ComponentPhoto', modality='image', title=bmw['title'], caption_text=bmw['caption'], blob=asset_path(bmw).read_bytes(), program_ref='EXTERNAL-REFERENCE', linked_entity_type='Reference', linked_entity_id=bmw['id'], provenance=bmw['author']+' · '+bmw['license']+' · Visual reference only', source_url=bmw['source_url'], license_url=bmw['license_url']))
+    return assets + generated_reports() + reference_photos() + reference_assets()
 
 
 if __name__ == "__main__":

@@ -31,7 +31,9 @@ def _headers() -> dict[str, str]:
 
     ``NPI_API_BEARER_TOKEN`` is the explicit configuration name.  The original
     ``NPI_API_TOKEN`` remains a compatibility alias for existing clients.
-    Either value may be supplied as a raw token or as ``Bearer <token>``.
+    Use a Workbench API key with Application audience at the private app URL.
+    Either value may be supplied raw or as ``Bearer <key>``.
+    A CAI inference JWT is not an Application API key.
     """
     token = (os.environ.get("NPI_API_BEARER_TOKEN") or os.environ.get("NPI_API_TOKEN") or "").strip()
     if token.lower().startswith("bearer "):

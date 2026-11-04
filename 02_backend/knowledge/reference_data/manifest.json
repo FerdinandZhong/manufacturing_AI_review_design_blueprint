@@ -1,0 +1,108 @@
+{
+  "source_id": "RSC-C8RA06458J",
+  "title": "Thermal runaway of large automotive Li-ion batteries",
+  "doi": "10.1039/C8RA06458J",
+  "source_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC9091216/",
+  "license_url": "https://creativecommons.org/licenses/by/3.0/",
+  "attribution": "Andrey W. Golubkov, René Planteu, Philipp Krohn, Bernhard Rasch, Bernhard Brunnsteiner, Alexander Thaler and Viktor Hacker (2018). Thermal runaway of large automotive Li-ion batteries. RSC Advances. DOI: 10.1039/C8RA06458J. CC BY 3.0.",
+  "chemistry": "LMO",
+  "assets": [
+    {
+      "id": "RES-cell-before-after",
+      "file": "cell-before-after.jpg",
+      "title": "Cell before and after thermal runaway",
+      "modality": "image",
+      "mime_type": "image/jpeg",
+      "locator": "Fig. 2",
+      "experiment_ids": [],
+      "caption": "Published before/after cell photograph. The source does not assign this image to a numbered experiment.",
+      "concepts": [
+        "thermal_response",
+        "venting"
+      ],
+      "source_id": "RSC-C8RA06458J",
+      "source_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC9091216/#fig2",
+      "sha256": "9b8a3ccdd378095851bac1000af25cdaf1dec2be0c8ae6be9569bb9f77fcd55c",
+      "author": "Golubkov et al.",
+      "license": "CC BY 3.0",
+      "license_url": "https://creativecommons.org/licenses/by/3.0/",
+      "applicability": "External LMO cell study; not Atlas NMC811 validation or a pack acceptance threshold.",
+      "review_status": "Source-locator and table-cell verification",
+      "unit": "See Table 2 definitions"
+    },
+    {
+      "id": "RES-experiment-7",
+      "file": "experiment-7.jpg",
+      "title": "Experiment 7 — temperature, pressure, and gas release",
+      "modality": "image",
+      "mime_type": "image/jpeg",
+      "locator": "Fig. 13",
+      "experiment_ids": [
+        "7"
+      ],
+      "caption": "Published curves for experiment 7, one-sided heating. Join to Table 2 row 7 by source ID and experiment number.",
+      "concepts": [
+        "thermal_response",
+        "venting"
+      ],
+      "source_id": "RSC-C8RA06458J",
+      "source_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC9091216/#fig13",
+      "sha256": "e89f9379cd590f9cb34b0f64a9dd5258efa3f23866f54b23082dc41e4797b1bc",
+      "author": "Golubkov et al.",
+      "license": "CC BY 3.0",
+      "license_url": "https://creativecommons.org/licenses/by/3.0/",
+      "applicability": "External LMO cell study; not Atlas NMC811 validation or a pack acceptance threshold.",
+      "review_status": "Source-locator and table-cell verification",
+      "unit": "See Table 2 definitions"
+    },
+    {
+      "id": "RES-study-excerpt",
+      "file": "source-excerpt.txt",
+      "title": "Study definitions, experiment table, and figure captions",
+      "modality": "text",
+      "mime_type": "text/plain",
+      "locator": "Tables 1–2; Figs. 2 and 13",
+      "experiment_ids": [
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "10",
+        "11"
+      ],
+      "caption": "Source excerpts define the measured quantities and document all eleven experiments. Numeric data are external LMO-cell measurements.",
+      "concepts": [
+        "thermal_response",
+        "venting",
+        "transferability"
+      ],
+      "source_id": "RSC-C8RA06458J",
+      "source_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC9091216/#tab2",
+      "sha256": "68d0be1c53727c5d89abaff673bd9ff7f01609ccd47e5f767de500073bc1372f",
+      "author": "Golubkov et al.",
+      "license": "CC BY 3.0",
+      "license_url": "https://creativecommons.org/licenses/by/3.0/",
+      "applicability": "External LMO cell study; not Atlas NMC811 validation or a pack acceptance threshold.",
+      "review_status": "Source-locator and table-cell verification",
+      "unit": "See Table 2 definitions"
+    }
+  ],
+  "measurements_sha256": "7e82f2d8804d1c3883cc91b47dce2f07f1d95cce034e981dde4b3be6c9fdcf6f",
+  "source_xml_sha256": "e791e1972e54bde29cacb85ba645eed4690a003fba65419dfddb9be240512150",
+  "retrieval_url": "https://www.ebi.ac.uk/europepmc/webservices/rest/PMC9091216/fullTextXML",
+  "figure_retrieval_url": "https://www.ebi.ac.uk/europepmc/webservices/rest/PMC9091216/supplementaryFiles",
+  "extraction": "Table 2 columns No, Type, Vbefore_cell, Tmax_cell and nV; chemistry from Table 1. Source values retained; no interpolation.",
+  "expected_row_count": 11,
+  "measurements_file": "experiments.csv",
+  "units": {
+    "peak_cell_temperature_c": "degC (maximum cell case temperature)",
+    "total_gas_mol": "mol (overall released gas)",
+    "initial_voltage_v": "V"
+  },
+  "boundary": "External cell measurements are not equivalent to the synthetic Atlas thermal margin basis. Figure 2 has no numbered experiment identity."
+}

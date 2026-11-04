@@ -67,3 +67,39 @@ python api/main.py                     # → TestClient smoke of key endpoints
 ## Known Phase-1 debt (non-blocking)
 
 Unused `SOURCE_TABLES` constant; unused `react-router-dom`/`recharts` frontend deps; `aml-*` CSS token names retained from the AML scaffold; `sentence-transformers`/`Pillow` used-but-optional (guarded, not in `requirements.txt`); README doesn't state `install.py` is a prerequisite; no true fresh-venv install has been run. See [TODO.md](TODO.md).
+
+
+## Optional NiFi reader configuration
+
+Set these variables in the backend environment before starting the app:
+
+```bash
+export NIFI_API_URL=https://your-nifi-host/nifi-api
+export NIFI_PROCESS_GROUP_ID=root  # Prefer a specific process-group UUID.
+# NIFI_TOKEN: bearer token, if required; set through your environment secret manager.
+# NIFI_CA_BUNDLE: optional path to a trusted PEM CA bundle.
+python start_app.py
+```
+
+TLS verification remains enabled. Tokens require HTTPS. Browser requests cannot supply a target URL or credentials.
+The backend permits three fixed GET routes and limits each response to 4 MB.
+Inventory output includes at most 100 processors, 100 connections, and 100 retained bulletins.
+The reader does not import code or credentials from the reference UOB project.
+
+Run `python -m pytest 02_backend/tests/test_nifi.py -q` for mocked live-source and sample checks.
+Live deployment still requires connection validation against the intended NiFi instance.
+
+## Unified data v2
+
+Implemented shared revision scope, independent observations, exact report links, issue history, and shared cockpit/canvas/review metrics. See [unified-data-v2.md](unified-data-v2.md) for source contracts, endpoints, validation, and remaining production limitations.
+
+## Demo/Pilot foundation
+
+Data mode, read-only canonical pilot imports, source readiness, native Workbench RO/RW enforcement, same-origin mutation checks, and authenticated actor audit are implemented. See [foundation runtime and security](foundation-runtime-security.md). Pilot review execution, source freshness acceptance, real connectors, and remote Workbench acceptance remain pending.
+
+Local development uses Demo mode on loopback. Workbench requires production proxy serving, a private Application, `NPI_AUTH_MODE=workbench`, `NPI_PUBLIC_ORIGIN`, and verified `NPI_TRUSTED_PROXY_CIDRS`. `NPI_APP_MODE` selects frontend serving and does not select the data mode.
+
+
+## Knowledge v3
+
+See [knowledge-v3.md](knowledge-v3.md) for the pinned embedding contract, build-time extraction, scoped retrieval, conservative narration, and explicit OCR command. Normal preparation and runtime never initiate paid OCR.

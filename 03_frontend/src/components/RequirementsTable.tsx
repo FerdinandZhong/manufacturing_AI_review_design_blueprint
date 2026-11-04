@@ -24,15 +24,14 @@ export const RequirementsTable: React.FC<Props> = ({ programId }) => {
 
   return (
     <div className="bg-surface-1 rounded-lg shadow-soft overflow-hidden">
-      <div className="flex items-center gap-1 border-b border-surface-3 px-3 py-2">
+      <div className="record-tabs">
         {(['requirements', 'design', 'bom'] as Tab[]).map(t => (
           <button
-            key={t}
+            key={t === 'bom' ? 'Bill of materials' : t === 'design' ? 'Design specifications' : 'Requirements'}
             onClick={() => setTab(t)}
-            className={`text-2xs font-semibold uppercase tracking-wide px-2.5 py-1 rounded-full transition-colors
-              ${tab === t ? 'bg-accent text-white' : 'text-ink-faint hover:text-ink-muted'}`}
+            aria-pressed={tab === t}
           >
-            {t}
+            {t === 'bom' ? 'Bill of materials' : t === 'design' ? 'Design specifications' : 'Requirements'}
           </button>
         ))}
       </div>

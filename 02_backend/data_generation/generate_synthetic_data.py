@@ -3,18 +3,11 @@
 Deterministic (SEED=42): re-running this script must produce byte-identical
 CSVs. Source data only — never touches the SQLite ops store (see common/db.py).
 
-Test-bench formula (Task 3, pinned here so the numbers below make sense):
-    measured_value = design_spec.value          (FACTOR=1.0, no transform)
-    margin = (measured_value - target_value) / target_value
-    PASS if margin >= 0.10 | MARGINAL if 0 <= margin < 0.10 | FAIL if margin < 0
-
-Showcase (PACK-ATLAS-01) thermal is pinned to margin ~= +0.03 -> MARGINAL,
-everything else tested in the showcase lands margin ~= 0.15-0.25 -> PASS, and
-the showcase's cost requirement is deliberately left without a test_plans row
-(coverage gap). Historical PACK-ORION-00's and PACK-VEGA-00's thermal both
-land margin < 0 -> FAIL (the ML label=1 seed for Task 5 — two historical
-thermal FAILs give is_thermal a real correlation with the label); everything
-else historical lands PASS.
+This is the original baseline regression fixture. Its design margins preserve
+historical model features. Independent observation fixtures now live in
+ generate_snapshots.py and common.source.list_observations. The test bench
+never reads design values. Expanded revisions provide engineering targets,
+explicit acceptance direction, observation conditions, and corrective actions.
 """
 import sys
 import os
@@ -255,6 +248,8 @@ def _write_csv(path: str, columns: list[str], rows: list[dict]) -> None:
 
 
 def generate(out_dir: str) -> dict:
+    from common.runtime import require_demo
+    require_demo('Synthetic CSV generation')
     random.seed(42)  # reseed on every call so repeated in-process runs stay byte-identical
     programs, requirements, design_specs, bom_items, suppliers, test_plans = build_rows()
     os.makedirs(out_dir, exist_ok=True)
@@ -272,6 +267,10 @@ def generate(out_dir: str) -> dict:
 
 
 if __name__ == "__main__":
+    from common.runtime import data_mode
+    if data_mode()=='pilot':
+        print('Pilot profile: synthetic generation task skipped; source remains read-only')
+        sys.exit(0)
     import hashlib
 
     cfg = get_config()

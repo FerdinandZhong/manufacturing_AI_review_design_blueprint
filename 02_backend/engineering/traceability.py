@@ -1,6 +1,7 @@
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from common import source
+from common.runtime import data_mode
 from common.db import get_connection
 
 REQUIRED_STANDARDS = ["UN38.3","GB 38031","IEC 62660"]
@@ -16,23 +17,35 @@ def coverage(program_id: str) -> dict:
             "pct": round(len(traced)/total, 3) if total else 0.0}
 
 def build_matrix(program_id: str) -> dict:
-    specs = {s["req_id"]: s["spec_id"] for s in source.list_design_specs(program_id)}
-    tests = {t["req_id"]: t["test_id"] for t in source.list_test_plans(program_id)}
-    conn = get_connection()
-    try:
-        vr = {row["test_id"]: row["verdict"] for row in
-              conn.execute("SELECT test_id,verdict FROM test_results WHERE program_id=?", (program_id,))}
-    finally:
-        conn.close()
+    specs = source.list_design_specs(program_id)
+    tests = source.list_test_plans(program_id)
+    pilot = data_mode()=='pilot'
+    vr = {}
+    if not pilot:
+        conn = get_connection()
+        try:
+            vr = {row['test_id']: row['verdict'] for row in conn.execute(
+                'SELECT test_id,verdict FROM test_results WHERE program_id=? AND snapshot_id=?',
+                (program_id,source.snapshot_identity(program_id)['snapshot_id']))}
+        finally:
+            conn.close()
     rows = []
     for r in source.list_requirements(program_id):
-        tid = tests.get(r["req_id"])
-        rows.append({"req_id": r["req_id"], "category": r["category"],
-                     "spec_id": specs.get(r["req_id"]), "test_id": tid,
-                     "verdict": vr.get(tid) if tid else None})
+        spec_ids = [v['spec_id'] for v in specs if v['req_id'] == r['req_id']]
+        test_ids = [v['test_id'] for v in tests if v['req_id'] == r['req_id']]
+        verdicts = [vr[t] for t in test_ids if t in vr]
+        worst = max(verdicts, key={'PASS':0,'MARGINAL':1,'FAIL':2}.get) if verdicts else None
+        rows.append({'req_id':r['req_id'], 'category':r['category'],
+                     'spec_id':spec_ids[0] if spec_ids else None,
+                     'test_id':test_ids[0] if test_ids else None,
+                     'spec_ids':spec_ids, 'test_ids':test_ids, 'verdict':worst})
+    if pilot:
+        return {'program_id':program_id,'rows':rows,'status':'structural_only','verdict_status':'unavailable_pending_approved_pilot_rules'}
     return {"program_id": program_id, "rows": rows}
 
-def missing_standards(program_id: str) -> list[str]:
+def missing_standards(program_id: str) -> list[str] | None:
+    if data_mode()=='pilot':
+        return None
     have = {t.get("standard") for t in source.list_test_plans(program_id)}
     return [s for s in REQUIRED_STANDARDS if s not in have]
 
@@ -46,6 +59,10 @@ def decide(cov: dict, results: list[dict], missing_std: list[str]) -> str:
 
 if __name__ == "__main__":
     from common.db import init_db; from engineering.test_bench import run_test_bench
+    import tempfile
+    import common.db as db
+    _tmp = tempfile.mkdtemp()
+    db.get_db_path = lambda: os.path.join(_tmp, "trace.db")
     init_db(); run_test_bench("PACK-ATLAS-01")
     cov = coverage("PACK-ATLAS-01")
     assert cov["total"] >= 5

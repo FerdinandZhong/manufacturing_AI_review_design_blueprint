@@ -18,6 +18,8 @@ def _seed():
     for p in ["PACK-ORION-00", "PACK-VEGA-00", SHOWCASE]:
         run_test_bench(p)
     train()
+    from ml.risk_model import score_program
+    score_program(SHOWCASE)
     build_kb()
 
 

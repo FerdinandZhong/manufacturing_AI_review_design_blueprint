@@ -60,7 +60,7 @@ describe(cls: str) -> dict ; validate_asset(asset: dict) -> bool
 ```python
 embed(text: str) -> list[float]                   # precomputed model or deterministic hashing fallback
 build_kb() -> int                                 # (re)builds assets.lance; returns row count
-search(query: str, ontology_filter: str|None=None, k: int=3) -> list[dict]   # cls validated vs classes()
+search(query: str, ontology_filter: str|None=None, k: int=3, external_only: bool=False) -> list[dict]   # cls validated vs classes()
 get_asset(asset_id: str) -> dict                  # {..., "blob": bytes, "modality"}; bad id → KeyError
 ```
 
@@ -114,7 +114,7 @@ SSE event shapes: `{"type":"phase","phase":str}` · `{"type":"worker_start","wor
 | `RiskPanel` | `/risk` | ranked ML scores (HIGH in red) + top-5 feature bars |
 | `TraceabilityMatrix` | `/matrix` | req×(spec,test,verdict) grid; gaps + verdicts color-coded |
 | `GateReview` | SSE stream | Run button → worker cards + streamed narrative + recommendation badge |
-| `KnowledgeCards` | `/kb/search`, `/asset/{id}` | multimodal cards: thumbnail + ontology class + linked entity |
+| `KnowledgeCards` | `/kb/search`, `/asset/{id}` | scoped evidence list with direct/historical/external filters; balanced default preserves external references |
 | `DecisionControl` | `POST /decision` | 3-way human gate decision (gated until a review completes) |
 | `Badge` / `PipelineStream` / `WorkflowGraph` | — | shared primitives reused from the scaffold |
 
@@ -130,3 +130,47 @@ App is a single-page cockpit (no router — Dashboard A is the only surface in P
 - `POST /api/config/llm/models/{id}/test`: probe without changing the active selection; return `{ok, message}`.
 
 KB search results additionally expose `provenance`, `source_url`, and `license_url`. Asset responses serve SVG, JPEG, and text with matching MIME types. The original model-resolution precedence remains active registry → runtime override → configuration.
+
+
+## NiFi reader HTTP API
+
+| Route | Response |
+|---|---|
+| `GET /api/nifi/config` | Configured flag, process-group ID, read-only flag; no credentials or server URL |
+| `GET /api/nifi/snapshot?mode=sample` | Deterministic synthetic flow, processors, connections, metrics, bulletin metadata, scope limitations |
+| `GET /api/nifi/snapshot?mode=live` | Projected NiFi snapshot; 503 for missing/invalid configuration, 502 for upstream failure |
+
+`mode` accepts only `sample` and `live`. It defaults to `sample`.
+Live reads resolve `root` to its concrete group ID before scoping status and bulletin requests.
+The source timestamp is returned without timezone inference. Missing numeric metrics remain null.
+NiFi data is independent of seeded engineering results and is never persisted by this reader.
+
+
+### Predefined semantic context
+
+`GET /api/semantic/model` returns the read-only contract and per-source validation states.
+`GET /api/semantic/context?question_id=thermal|packaging|venting|applicability` returns resolved records, relationships, facts, evidence links and a stable context fingerprint.
+`POST /api/semantic/explain` accepts `question_id`, `narration` (`template` or `model`), and `include_images`.
+Code selects the context before the model call. Unknown or absent model citation references trigger the deterministic fallback.
+The response labels image input separately from caption-only narration. Fallback output does not claim model inference.
+`GET /api/semantic/assets/{asset_id}` serves only checksum-validated source files.
+`GET /api/semantic/experiments.csv` serves measurements only when research validation succeeds.
+Missing research does not block graph discovery or the five attributed original photographs.
+
+## Unified data v2
+
+Implemented shared revision scope, independent observations, exact report links, issue history, and shared cockpit/canvas/review metrics. See [unified-data-v2.md](unified-data-v2.md) for source contracts, endpoints, validation, and remaining production limitations.
+
+## Demo/Pilot foundation
+
+Data mode, read-only canonical pilot imports, source readiness, native Workbench RO/RW enforcement, same-origin mutation checks, and authenticated actor audit are implemented. See [foundation runtime and security](foundation-runtime-security.md). Pilot review execution, source freshness acceptance, real connectors, and remote Workbench acceptance remain pending.
+
+
+## Knowledge v3
+
+See [knowledge-v3.md](knowledge-v3.md) for the pinned embedding contract, build-time extraction, scoped retrieval, conservative narration, and explicit OCR command. Normal preparation and runtime never initiate paid OCR.
+
+
+### Review assessment signals
+
+`worker_done` may include an `assessment` object. `designrisk` uses `kind: model_risk`, the uncalibrated `score`, `entity_id`, `risk_band`, `model_version`, counts, and retained `evidence_ids`. Missing scores are null. `knowledgereuse` uses `kind: retrieval`, the actual query and method, retained evidence IDs, and ranked hits with `score`, `lexical_score`, `vector_score`, `evidence_kind`, `support`, and `ocr_unverified`. These fields are code-derived and persist in `worker_results`. They are supporting review signals and never inputs to `decide`.

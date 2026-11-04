@@ -21,7 +21,7 @@
 
 ## Deterministic compute (the "code decides" core)
 
-- **`engineering/test_bench.py`** — `run_test_bench(pid)` computes each DVP&R `measured_value` from the design spec value (`FACTOR` = 1.0 per category in Phase 1), `margin = (measured - target)/target`, and a verdict: `margin ≥ 0.10 → PASS`, `0 ≤ margin < 0.10 → MARGINAL`, `margin < 0 → FAIL`. Result IDs use `uuid5` (deterministic). Writes `test_results`.
+- **`engineering/test_bench.py`** averages independent seeded observation records and applies each plan's directional acceptance margin. Result IDs include the program revision scope. See [unified engineering data](unified-data-v2.md).
 - **`engineering/traceability.py`** — `coverage(pid)` (traced vs. gaps), `build_matrix(pid)` (req→spec→test→verdict grid), `missing_standards(pid)` (against `REQUIRED_STANDARDS = ["UN38.3","GB 38031","IEC 62660"]`), and the pure decision function:
   ```
   decide(cov, results, missing_std):
@@ -69,3 +69,16 @@ React 19 + Vite + Tailwind 4 single-page cockpit. `src/api.ts` holds typed fetch
 - `python 02_backend/scripts/prepare.py` — bootstrap (init_db + test_bench ×3 + train + build_kb; asserts thermal MARGINAL + risk HIGH).
 - `python start_app.py` — **local dev**: delegates to `03_frontend/start_frontend.py` (which co-locates the backend). Ports: `BACKEND_PORT=7078`, frontend `CDSW_APP_PORT` (fallback `8100`).
 - CAI AMP (`.project-metadata.yaml`) start task points at `03_frontend/start_frontend.py`.
+
+## Unified revisions
+
+The cockpit, canvas, and reviews share scoped revision keys and snapshot identities. See [the data contract](unified-data-v2.md).
+
+## Demo/Pilot foundation
+
+Data mode, read-only canonical pilot imports, source readiness, native Workbench RO/RW enforcement, same-origin mutation checks, and authenticated actor audit are implemented. See [foundation runtime and security](foundation-runtime-security.md). Pilot review execution, source freshness acceptance, real connectors, and remote Workbench acceptance remain pending.
+
+
+## Knowledge v3
+
+See [knowledge-v3.md](knowledge-v3.md) for the pinned embedding contract, build-time extraction, scoped retrieval, conservative narration, and explicit OCR command. Normal preparation and runtime never initiate paid OCR.

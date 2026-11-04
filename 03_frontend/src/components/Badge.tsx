@@ -3,7 +3,7 @@ import React from 'react'
 // Text colors mirror the aml-* status tokens (single source); bg/border are tints.
 const BAND_CFG: Record<string, { bg: string; text: string; border: string }> = {
   CRITICAL: { bg: '#fef2f2', text: '#dc2626', border: '#fecaca' },  // aml-red
-  HIGH:     { bg: '#fff7ed', text: '#ea580c', border: '#fed7aa' },
+  HIGH:     { bg: '#fef2f2', text: '#dc2626', border: '#fecaca' },
   MEDIUM:   { bg: '#fffbeb', text: '#d97706', border: '#fde68a' },  // aml-amber
   LOW:      { bg: '#f0fdf4', text: '#059669', border: '#bbf7d0' },  // aml-green
 }

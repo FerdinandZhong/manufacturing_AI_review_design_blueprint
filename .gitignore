@@ -26,3 +26,10 @@ artifacts/deck_review/
 
 **/*.egg-info/
 .omc
+
+# Pilot operational databases are runtime artifacts, separate from demo data.
+data/pilot/*.db
+data/pilot/*.db-*
+
+# Validated OCR transcriptions are local build artifacts.
+data/kb/ocr_cache/
