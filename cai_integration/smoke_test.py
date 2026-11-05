@@ -27,6 +27,27 @@ def offline(*args, **kwargs):
     raise RuntimeError('Smoke check uses offline narration')
 
 
+def require_ok(response):
+    """Report HTTP failures before inspecting endpoint-specific result fields."""
+    if response.status_code != 200:
+        try:
+            detail = response.json().get('detail', 'Unexpected API error response')
+        except (ValueError, AttributeError):
+            detail = 'Non-JSON API error response'
+        raise RuntimeError(
+            f'Smoke check {response.request.url.path} returned HTTP '
+            f'{response.status_code}: {str(detail)[:300]}'
+        )
+    return response
+
+
+def require_object(response, field):
+    payload = require_ok(response).json()
+    if not isinstance(payload, dict) or field not in payload:
+        raise RuntimeError(f'Smoke check {response.request.url.path} returned an invalid response: missing {field}')
+    return payload
+
+
 def main():
     from common.runtime import data_mode
     if data_mode()=='pilot':
@@ -42,7 +63,9 @@ def main():
     previous_origin = os.environ.get('NPI_PUBLIC_ORIGIN')
     if auth_mode()=='workbench':
         os.environ['NPI_INGRESS_SECRET'] = secrets.token_urlsafe(48)
-        os.environ.setdefault('NPI_PUBLIC_ORIGIN','https://offline-smoke.invalid')
+        # AMP exposes optional defaults as empty strings. Use a test-owned origin
+        # for this in-process fixture, then restore the exact deployment setting.
+        os.environ['NPI_PUBLIC_ORIGIN'] = 'https://offline-smoke.invalid'
     def mock_identity(request):
         if auth_mode()=='workbench':
             actor, permission, kind = 'offline-smoke-fixture','RW','machine'
@@ -59,17 +82,18 @@ def main():
             score_program('PACK-ATLAS-01')
             with TestClient(app,client=('127.0.0.1',50000)) as client:
                 client.event_hooks['request']=[mock_identity]
-                assert client.get('/api/health').json()['status'] == 'ok'
-                risk = client.get('/api/programs/PACK-ATLAS-01/risk').json()
+                assert require_object(client.get('/api/health'), 'status')['status'] == 'ok'
+                risk = require_object(client.get('/api/programs/PACK-ATLAS-01/risk'), 'scores')
+                assert isinstance(risk['scores'], list), 'Risk endpoint must return a scores list'
                 assert any(r['risk_band'] == 'HIGH' and 'thermal' in r['entity_id'] for r in risk['scores'])
-                hits = client.get('/api/kb/search', params={'q': 'thermal'}).json()
-                assert hits
+                hits = require_ok(client.get('/api/kb/search', params={'q': 'thermal'})).json()
+                assert isinstance(hits,list) and hits, 'Knowledge search returned no asset list'
                 for hit in hits:
-                    assert client.get('/api/asset/' + hit['asset_id']).content
-                response = client.get('/api/review/PACK-ATLAS-01/stream?review_id=REV-DEPLOY-SMOKE')
+                    assert require_ok(client.get('/api/asset/' + hit['asset_id'])).content
+                response = require_ok(client.get('/api/review/PACK-ATLAS-01/stream?review_id=REV-DEPLOY-SMOKE'))
                 import json
                 events = [json.loads(line[6:]) for line in response.text.splitlines() if line.startswith('data: ')]
-                assert events[-1]['type'] == 'done'
+                assert events and events[-1]['type'] == 'done', 'Review stream did not complete'
                 assert sum(e['type'] == 'worker_done' for e in events) == 5
                 assert [e['value'] for e in events if e['type'] == 'recommendation'] == ['CONDITIONAL']
     finally:

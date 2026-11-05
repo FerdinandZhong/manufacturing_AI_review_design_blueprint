@@ -119,3 +119,10 @@ subprocess.check_call([sys.executable, "-m", "pip", "install", "--upgrade", "-r"
 Stop that Workbench session and start a new session before rerunning Step 3 (`02_backend/scripts/prepare.py`). Notebook cells can retain the old NumPy binary after pip installs a replacement. Repeating the import in the same kernel does not reload the binary stack. Rerun preparation to rebuild the model and knowledge artifacts with the pinned versions.
 
 Reference: [Apache Arrow installation requirements](https://arrow.apache.org/docs/python/install.html).
+
+
+## Workbench Step 4 authorization fixture
+
+The offline smoke test uses signed, test-owned loopback requests in Workbench mode. AMP can set optional `NPI_PUBLIC_ORIGIN` to an empty string. A previous `setdefault()` preserved that empty value, so the risk endpoint returned HTTP 403 and the smoke test raised `KeyError: scores` while reading the error response. The smoke test now sets a temporary synthetic origin and secret, then restores the exact original deployment values. HTTP errors are checked before response fields are accessed. Real application authorization remains enforced.
+
+After updating the project, rerun `cai_integration/smoke_test.py` (AMP Step 4). No package reinstall or Step 3 regeneration is required for this fix. Success prints `NPI smoke OK: HIGH risk, assets, 5 workers, CONDITIONAL, done`.

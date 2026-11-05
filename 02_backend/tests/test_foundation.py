@@ -251,10 +251,13 @@ def test_readiness_does_not_invent_prepared_reviews(secured):
     assert not response['review_ready']
 
 
-def test_offline_smoke_uses_mocked_workbench_hop(secured,monkeypatch):
+@pytest.mark.parametrize('configured_origin',[None, '', 'https://configured-workbench.invalid'])
+def test_offline_smoke_uses_mocked_workbench_hop(secured,monkeypatch,configured_origin):
     monkeypatch.setenv('CDSW_DOMAIN','test-workbench.invalid')
     monkeypatch.delenv('NPI_AUTH_MODE',raising=False)
     monkeypatch.delenv('NPI_PUBLIC_ORIGIN',raising=False)
+    if configured_origin is not None:
+        monkeypatch.setenv('NPI_PUBLIC_ORIGIN',configured_origin)
     monkeypatch.delenv('NPI_INGRESS_SECRET',raising=False)
     from engineering.test_bench import run_test_bench
     from ml.train import train
@@ -268,8 +271,21 @@ def test_offline_smoke_uses_mocked_workbench_hop(secured,monkeypatch):
     smoke=importlib.util.module_from_spec(spec);spec.loader.exec_module(smoke)
     smoke.main()
     assert 'NPI_INGRESS_SECRET' not in os.environ
-    assert 'NPI_PUBLIC_ORIGIN' not in os.environ
+    assert os.environ.get('NPI_PUBLIC_ORIGIN') == configured_origin
     assert auth_mode()=='workbench'
+
+
+def test_smoke_http_failures_report_status_and_detail():
+    root=Path(__file__).parents[2]
+    spec=importlib.util.spec_from_file_location('diagnostic_smoke',root/'cai_integration/smoke_test.py')
+    smoke=importlib.util.module_from_spec(spec);spec.loader.exec_module(smoke)
+    request=httpx.Request('GET','http://testserver/api/programs/PACK-ATLAS-01/risk')
+    denied=httpx.Response(403,json={'detail':'Invalid trusted frontend proof'},request=request)
+    with pytest.raises(RuntimeError,match='HTTP 403: Invalid trusted frontend proof'):
+        smoke.require_object(denied,'scores')
+    invalid=httpx.Response(200,json={'unexpected':[]},request=request)
+    with pytest.raises(RuntimeError,match='missing scores'):
+        smoke.require_object(invalid,'scores')
 
 
 def test_pilot_metrics_ignore_demo_policies_and_operational_rows(secured,monkeypatch,tmp_path):
