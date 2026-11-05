@@ -97,7 +97,7 @@ Implemented shared revision scope, independent observations, exact report links,
 
 Data mode, read-only canonical pilot imports, source readiness, native Workbench RO/RW enforcement, same-origin mutation checks, and authenticated actor audit are implemented. See [foundation runtime and security](foundation-runtime-security.md). Pilot review execution, source freshness acceptance, real connectors, and remote Workbench acceptance remain pending.
 
-Local development uses Demo mode on loopback. Workbench requires production proxy serving, a private Application, `NPI_AUTH_MODE=workbench`, `NPI_PUBLIC_ORIGIN`, and verified `NPI_TRUSTED_PROXY_CIDRS`. `NPI_APP_MODE` selects frontend serving and does not select the data mode.
+Local development uses Demo mode on loopback. Workbench requires production proxy serving, a private Application, `NPI_AUTH_MODE=workbench`, and the standard loopback proxy. The Application origin is derived from its subdomain and `CDSW_DOMAIN`. `NPI_APP_MODE` selects frontend serving and does not select the data mode.
 
 
 ## Knowledge v3
@@ -132,12 +132,13 @@ After updating the project, rerun `cai_integration/smoke_test.py` (AMP Step 4). 
 
 A loaded frontend and HTTP 200 health/root probes do not establish authorized API access. Open the application's `/api/runtime/status` URL and inspect its HTTP status and JSON `detail`. The page now shows this detail and provides Retry; frontend denial logs record the request path, observed socket peer, and reason without credential headers.
 
-For Workbench applications, configure both variables in the Application environment and restart the Application:
+Standard AMP setup requires no origin or proxy input. Leave `NPI_PUBLIC_ORIGIN` blank. The app derives `https://vehicle-npi-platform.<CDSW_DOMAIN>` from the AMP subdomain and Workbench environment. The proxy defaults to `127.0.0.1/32,::1/128`, matching the loopback-only listener. Existing empty environment values also use these defaults.
 
-- `NPI_PUBLIC_ORIGIN`: the exact external HTTPS origin shown in the application's browser URL, with no path.
-- `NPI_TRUSTED_PROXY_CIDRS`: the verified platform ingress socket peer ranges that reach the frontend. Use the observed peer in denial logs and confirm it belongs to the Workbench ingress. Do not use wildcard ranges or trust forwarded IP headers.
+For a renamed Application, set `NPI_APP_SUBDOMAIN` to its subdomain. The API deployment script supplies this automatically. For a custom external URL, set `NPI_PUBLIC_ORIGIN` to its exact HTTPS origin. `NPI_TRUSTED_PROXY_CIDRS` remains an optional override for a custom ingress. Neither setting is learned from request headers.
 
-An origin error means the first setting is blank or invalid. An ingress error means the second setting is blank or excludes the actual peer. Missing native identity means the platform ingress is not supplying the expected authenticated user/permission headers; origin/CIDR changes cannot substitute for that identity. Retain Workbench authorization; local_demo is only for local development. The AMP manifest now requires these inputs rather than advertising them as optional.
+After pulling this fix into an existing project, restart the Application. No dependency installation, data regeneration, or frontend rebuild is needed for the defaults. Native Workbench user/permission headers, signed backend hops, and same-origin mutation checks remain enforced.
+
+The URL convention and loopback binding follow Cloudera's [Application deployment documentation](https://docs.cloudera.com/cdsw/latest/analytical-apps/topics/cdsw-testing-before-deploy.html) and [runtime environment documentation](https://docs.cloudera.com/cdsw/1.10.5/runtimes/topics/ml-engine-environment-variables-runtimes.html).
 
 
 Successful `GET`/`HEAD` probes to `/` and `/api/health` are suppressed in frontend and backend Uvicorn access logs. Other API requests, failed probes, startup errors, and Workbench authorization-denial diagnostics remain visible. The same logging configuration applies to normal and notebook launch paths. Restart the Application after updating the launchers to activate the filter.

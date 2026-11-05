@@ -96,12 +96,12 @@ Pilot also defaults to Workbench authorization even outside the platform.
 The application refuses `local_demo` authorization in Pilot mode or detected Workbench environments.
 Local Demo binds loopback and labels its explicit development actor `local-demo`.
 
-Configure both required deployment values:
+Standard Workbench deployment resolves these values without setup input:
 
-1. `NPI_PUBLIC_ORIGIN=https://<exact-private-app-host>` defines the expected browser origin.
-2. `NPI_TRUSTED_PROXY_CIDRS=<verified socket peer networks>` identifies the native Workbench ingress.
+1. The origin is `https://vehicle-npi-platform.<CDSW_DOMAIN>`. A renamed app supplies `NPI_APP_SUBDOMAIN`; a custom URL uses `NPI_PUBLIC_ORIGIN`.
+2. Trusted proxy peers default to `127.0.0.1/32,::1/128`, matching the loopback-only listener. `NPI_TRUSTED_PROXY_CIDRS` can override these for a custom ingress.
 
-Empty or invalid configuration rejects protected requests.
+Empty overrides use the defaults. Invalid origins and untrusted peers reject protected requests.
 Do not use arbitrary forwarded headers to discover the trusted peer.
 Both Uvicorn listeners disable proxy-header rewriting.
 The frontend and backend bind loopback. Workbench must reach the frontend through its private application proxy.

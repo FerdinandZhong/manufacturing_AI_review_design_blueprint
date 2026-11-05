@@ -155,11 +155,69 @@ def test_proxy_replaces_internal_identity_and_strips_credentials(secured,monkeyp
     assert response.status_code==403
     assert 'NPI_TRUSTED_PROXY_CIDRS' in response.json()['detail']
     monkeypatch.setenv('NPI_PUBLIC_ORIGIN','')
+    monkeypatch.delenv('CDSW_DOMAIN', raising=False)
     response=client.get('/api/runtime/status',headers=raw)
     assert response.status_code==403
     assert 'NPI_PUBLIC_ORIGIN' in response.json()['detail']
     assert 'peer=10.20.30.40' in caplog.text
     assert 'Bearer secret' not in caplog.text and 'trusted-forgery' not in caplog.text
+
+
+@pytest.mark.parametrize('configured', [None, ''])
+def test_workbench_defaults_end_to_end(secured, monkeypatch, configured):
+    """An AMP with no user-supplied ingress settings serves authenticated APIs."""
+    for name in ('NPI_PUBLIC_ORIGIN', 'NPI_TRUSTED_PROXY_CIDRS'):
+        if configured is None:
+            monkeypatch.delenv(name, raising=False)
+        else:
+            monkeypatch.setenv(name, configured)
+    monkeypatch.setenv('CDSW_DOMAIN', 'workbench.example.com')
+    monkeypatch.delenv('NPI_APP_SUBDOMAIN', raising=False)
+    from common.security import public_origin, forwarded_identity
+    from starlette.requests import Request
+    origin = 'https://vehicle-npi-platform.workbench.example.com'
+    assert public_origin() == origin
+
+    def through_frontend(path, method='GET', peer='127.0.0.1', browser_origin=origin, permission='RW'):
+        request = Request({'type':'http', 'method':method, 'path':path, 'query_string':b'',
+                           'client':(peer, 5000), 'server':('127.0.0.1', 8100), 'scheme':'http',
+                           'headers':[(b'remote-user', b'workbench-user'),
+                                      (b'remote-user-perm', permission.encode()),
+                                      (b'origin', browser_origin.encode())]})
+        identity = forwarded_identity(request, SECRET)
+        return secured.request(method, path, json={} if method == 'POST' else None,
+                               headers={**identity, 'origin':browser_origin})
+
+    response = through_frontend('/api/runtime/status')
+    assert response.status_code == 200
+    assert response.json()['identity']['actor'] == 'workbench-user'
+    # An authorized mutation reaches schema validation; foreign origins and RO do not.
+    assert through_frontend('/api/config/llm/models', 'POST').status_code == 422
+    assert through_frontend('/api/config/llm/models', 'POST', browser_origin='https://evil.example').status_code == 403
+    assert through_frontend('/api/config/llm/models', 'POST', permission='RO').status_code == 403
+    with pytest.raises(PermissionError, match='Untrusted Workbench ingress'):
+        through_frontend('/api/runtime/status', peer='10.20.30.40')
+
+
+def test_origin_discovery_and_overrides(monkeypatch):
+    from common.security import public_origin, proxy_is_trusted
+    monkeypatch.setenv('NPI_PUBLIC_ORIGIN', '')
+    monkeypatch.setenv('CDSW_DOMAIN', 'workbench.example.com')
+    monkeypatch.setenv('NPI_APP_SUBDOMAIN', 'renamed-app')
+    assert public_origin() == 'https://renamed-app.workbench.example.com'
+    monkeypatch.setenv('CDSW_DOMAIN', 'evil.example/path')
+    with pytest.raises(ValueError):
+        public_origin()
+    monkeypatch.setenv('NPI_PUBLIC_ORIGIN', 'https://custom.example')
+    assert public_origin() == 'https://custom.example'
+    monkeypatch.setenv('NPI_PUBLIC_ORIGIN', 'http://custom.example')
+    with pytest.raises(ValueError):
+        public_origin()
+    monkeypatch.setenv('NPI_TRUSTED_PROXY_CIDRS', '')
+    assert proxy_is_trusted('127.0.0.1') and proxy_is_trusted('::1')
+    assert not proxy_is_trusted('10.1.2.3')
+    monkeypatch.setenv('NPI_TRUSTED_PROXY_CIDRS', '10.1.2.3/32')
+    assert proxy_is_trusted('10.1.2.3') and not proxy_is_trusted('127.0.0.1')
 
 
 def test_pilot_readonly_import_and_unavailable_capabilities(secured,monkeypatch,tmp_path):

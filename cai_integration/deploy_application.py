@@ -26,6 +26,7 @@ def build_payload(runtime, subdomain='vehicle-npi-platform'):
             'environment': {'BACKEND_PORT': '7078', 'NPI_APP_MODE': 'prod',
                             'LLM_PROVIDER': os.getenv('LLM_PROVIDER', 'caii'),
                             'NPI_AUTH_MODE':'workbench',
+                            'NPI_APP_SUBDOMAIN':subdomain,
                             'NPI_DATA_MODE':os.getenv('NPI_DATA_MODE','demo'),
                             **{k:os.environ[k] for k in ('NPI_PUBLIC_ORIGIN','NPI_TRUSTED_PROXY_CIDRS','NPI_SOURCE_PROVIDER','NPI_PILOT_SOURCE') if os.getenv(k)}}}
 

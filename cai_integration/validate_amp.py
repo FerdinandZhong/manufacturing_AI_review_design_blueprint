@@ -39,7 +39,8 @@ def validate(path: Path = METADATA, project_path: Path = PROJECT) -> dict:
     assert app.get("environment_variables", {}).get("TASK_TYPE", {}).get("default") == "START_APPLICATION"
     assert app["environment_variables"]["BACKEND_PORT"]["default"] != "${CDSW_APP_PORT}"
     for name in ('NPI_PUBLIC_ORIGIN', 'NPI_TRUSTED_PROXY_CIDRS'):
-        assert data.get('environment_variables', {}).get(name, {}).get('required') is True, f'{name} is required for Workbench API access'
+        assert data.get('environment_variables', {}).get(name, {}).get('required') is False, f'{name} must not require post-creation information at project setup'
+    assert data['environment_variables']['NPI_TRUSTED_PROXY_CIDRS']['default'] == '127.0.0.1/32,::1/128'
     project = yaml.safe_load(project_path.read_text())
     assert isinstance(project, dict), "project.yaml must be a YAML mapping"
     assert project.get("api_version") == "vehicle-npi.cloudera.ai/v1"

@@ -6,6 +6,7 @@ import hashlib
 import hmac
 import ipaddress
 import json
+import re
 from urllib.parse import urlsplit
 from common.runtime import auth_mode
 
@@ -14,18 +15,28 @@ IDENTITY = {'remote-user','remote-user-perm','remote_user','remote_user_perm'}
 
 
 def public_origin():
-    value = os.getenv('NPI_PUBLIC_ORIGIN','').rstrip('/')
+    value = os.getenv('NPI_PUBLIC_ORIGIN','').strip().rstrip('/')
+    if not value:
+        # AMP owns this subdomain before creation; Workbench supplies its domain
+        # at runtime. Never derive the CSRF boundary from request headers.
+        domain = os.getenv('CDSW_DOMAIN', '').strip()
+        subdomain = os.getenv('NPI_APP_SUBDOMAIN') or 'vehicle-npi-platform'
+        label = r'[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?'
+        if re.fullmatch(label, subdomain) and re.fullmatch(label + r'(?:\.' + label + r')*', domain):
+            value = f'https://{subdomain}.{domain}'
     url = urlsplit(value)
     _ = url.port
     if url.scheme != 'https' or not url.hostname or url.username or url.password or url.path or url.query or url.fragment:
-        raise ValueError('Workbench requires NPI_PUBLIC_ORIGIN as an exact HTTPS origin')
+        raise ValueError('Cannot resolve Application origin: CDSW_DOMAIN is unavailable or invalid; set NPI_PUBLIC_ORIGIN only for a custom HTTPS origin')
     return value
 
 
 def proxy_is_trusted(peer):
     try:
         address = ipaddress.ip_address(peer)
-        networks = [ipaddress.ip_network(c.strip()) for c in os.getenv('NPI_TRUSTED_PROXY_CIDRS','').split(',') if c.strip()]
+        # Both launchers bind only to loopback, per the Workbench port contract.
+        cidrs = os.getenv('NPI_TRUSTED_PROXY_CIDRS', '').strip() or '127.0.0.1/32,::1/128'
+        networks = [ipaddress.ip_network(c.strip()) for c in cidrs.split(',') if c.strip()]
         return bool(networks) and any(address in network for network in networks)
     except ValueError:
         return False
@@ -41,8 +52,6 @@ def forwarded_identity(request, secret):
     if auth_mode() == 'local_demo':
         return {}
     public_origin()
-    if not os.getenv('NPI_TRUSTED_PROXY_CIDRS','').strip():
-        raise PermissionError('Workbench requires NPI_TRUSTED_PROXY_CIDRS with verified ingress proxy ranges')
     if not proxy_is_trusted(request.client.host if request.client else ''):
         raise PermissionError('Untrusted Workbench ingress; verify NPI_TRUSTED_PROXY_CIDRS against the platform ingress peers')
     values = {}
