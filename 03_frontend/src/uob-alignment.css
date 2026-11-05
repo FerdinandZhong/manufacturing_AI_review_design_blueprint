@@ -36,6 +36,8 @@ button,input,select,textarea { font-family:inherit; }
 .quiet-button:hover { border-color:#bbccec; background:#fafcff; color:var(--accent); }
 .reader-notice { background:#f0f6ff; border-color:#dfebfe; color:#406393; }
 .reader-error { background:#fff4f4; border-color:#fecaca; color:#a02e3e; }
+.runtime-error-actions { display:flex; align-items:center; flex-wrap:wrap; gap:10px 18px; margin-top:10px; }
+.runtime-error-actions a { text-decoration:underline; }
 .reader-table { font-size:12px; }
 .reader-table th { background:#f9fafc; font-size:11px; font-weight:600; }
 .reader-table td,.reader-table th { padding:8px 12px; }

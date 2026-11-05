@@ -41,8 +41,10 @@ def forwarded_identity(request, secret):
     if auth_mode() == 'local_demo':
         return {}
     public_origin()
+    if not os.getenv('NPI_TRUSTED_PROXY_CIDRS','').strip():
+        raise PermissionError('Workbench requires NPI_TRUSTED_PROXY_CIDRS with verified ingress proxy ranges')
     if not proxy_is_trusted(request.client.host if request.client else ''):
-        raise PermissionError('Untrusted Workbench ingress')
+        raise PermissionError('Untrusted Workbench ingress; verify NPI_TRUSTED_PROXY_CIDRS against the platform ingress peers')
     values = {}
     for name in ('remote-user','remote-user-perm'):
         native = request.headers.getlist(name)

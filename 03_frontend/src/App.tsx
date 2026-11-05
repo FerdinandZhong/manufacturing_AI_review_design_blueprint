@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { isAxiosError } from 'axios'
 import { Boxes, ChevronRight, Factory, LayoutDashboard, Network, Search, ShieldCheck, Share2, Library } from 'lucide-react'
 import { ModelsView } from './components/ModelsView'
 import { SemanticView } from './components/SemanticView'
@@ -25,13 +26,18 @@ export default function App() {
   const [programId, setProgramId] = useState('PACK-ATLAS-01@atlas-v2')
   const [runtime, setRuntime] = useState<RuntimeStatus | null>(null)
   const [runtimeError, setRuntimeError] = useState('')
+  const [runtimeAttempt, setRuntimeAttempt] = useState(0)
   const [pilotPrograms, setPilotPrograms] = useState<Program[]>([])
   useEffect(() => {
     getRuntimeStatus().then(async status => {
       setRuntime(status)
       if (status.mode === 'pilot' && status.source_ready) { const programs = await getPrograms(); setPilotPrograms(programs); setProgramId(programs[0]?.program_id || '') }
-    }).catch(() => setRuntimeError('Workspace authorization or runtime status is unavailable. Check deployment configuration.'))
-  }, [])
+    }).catch((error: unknown) => {
+      const status = isAxiosError(error) ? error.response?.status : undefined
+      const detail: unknown = isAxiosError(error) ? error.response?.data?.detail : undefined
+      setRuntimeError(`Workspace status unavailable${status ? ` (HTTP ${status})` : ''}. ${typeof detail === 'string' ? detail : 'The runtime status request failed. Inspect the response for routing or backend errors.'}`)
+    })
+  }, [runtimeAttempt])
   const [view, setView] = useState<View>('cockpit')
   const [search, setSearch] = useState('')
   const page = pages.find(p => p.id === view)!
@@ -53,13 +59,13 @@ export default function App() {
           <div className="workspace-search"><Search size={16} /><input aria-label="Find a workspace page" placeholder="Find a workspace page…" value={search} onChange={e => setSearch(e.target.value)} onKeyDown={e => { if (e.key === 'Escape') setSearch('') }} />
             {search && <div className="search-results">{pages.filter(p => `${p.label} ${p.description}`.toLowerCase().includes(search.toLowerCase())).map(p => <button key={p.id} onClick={() => navigate(p.id)}>{p.label}<ChevronRight size={14} /></button>)}{!pages.some(p => `${p.label} ${p.description}`.toLowerCase().includes(search.toLowerCase())) && <p>No matching pages.</p>}</div>}
           </div>
-          <div className="top-actions"><span className="workspace-badge">{runtime ? `${runtime.mode === 'demo' ? 'Demo' : 'Pilot'} · ${runtime.identity.permission}` : 'Checking workspace'}</span><span className="header-profile"><img src="./favicon.svg" alt="" /><span><strong>Vehicle manufacturing</strong><small>Cloudera AI workspace</small></span></span></div>
+          <div className="top-actions"><span className="workspace-badge">{runtime ? `${runtime.mode === 'demo' ? 'Demo' : 'Pilot'} · ${runtime.identity.permission}` : runtimeError ? 'Workspace unavailable' : 'Checking workspace'}</span><span className="header-profile"><img src="./favicon.svg" alt="" /><span><strong>Vehicle manufacturing</strong><small>Cloudera AI workspace</small></span></span></div>
         </header>
         <div className="breadcrumb">AI workspace <ChevronRight size={12} /><span>{page.label}</span><small>New product introduction</small></div>
         <div className="workspace-page">
           <section className="page-heading" hidden={view === 'nifi'}><div><p className="eyebrow">{page.group}</p><h1>{page.label}</h1><p>{page.description}</p></div><span className="context-chip">{view === 'cockpit' ? (runtime?.mode === 'pilot' ? 'Read-only pilot inspection' : programId) : view === 'nifi' ? 'Read-only inspection' : view === 'semantic' ? 'Predefined context · Multimodal evidence' : view === 'knowledge' ? 'Attributed source collection' : 'Narration configuration'}</span></section>
           {runtime?.mode === 'demo' && (view === 'cockpit' || view === 'semantic' || view === 'knowledge') && <div className="program-context"><label className="revision-control"><span>Engineering revision</span><select aria-label="Engineering revision" value={programId} onChange={e => setProgramId(e.target.value)}>{SCENARIOS.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}</select></label><span className="program-source-status">Synthetic demo data · {runtime.source_ready ? 'Ready' : 'Not ready'}</span></div>}
-          {runtimeError && <p role="alert" className="reader-notice reader-error">{runtimeError}</p>}
+          {runtimeError && <div role="alert" className="reader-notice reader-error"><p>{runtimeError}</p><p>Workbench requires the application's HTTPS origin and trusted ingress proxy configuration.</p><div className="runtime-error-actions"><a href="/api/runtime/status" target="_blank" rel="noreferrer">Inspect runtime status response</a><button className="quiet-button" onClick={() => { setRuntimeError(''); setRuntimeAttempt(n => n + 1) }}>Retry workspace status</button></div></div>}
           {runtime?.mode === 'pilot' && <p className="reader-caption">Pilot source · {runtime.source.state} · {runtime.source.detail}</p>}
           {runtime?.mode === 'demo' && !runtime.review_ready && <p className="reader-notice">Review artifacts are unready. Run Demo preparation before reviewing.</p>}
           {runtime?.mode === 'pilot' && !runtime.source_ready && <p role="alert" className="reader-notice">Pilot source is unready. Configure a validated read-only source. No demo data was substituted.</p>}

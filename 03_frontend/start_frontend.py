@@ -134,6 +134,11 @@ def create_app(backend_port):
         try:
             identity = forwarded_identity(request,_ingress_secret)
         except (PermissionError,ValueError,RuntimeError) as error:
+            import logging
+            logging.getLogger('npi.frontend').warning(
+                'API authorization denied: path=%s peer=%s reason=%s',
+                request.url.path, request.client.host if request.client else 'unknown', str(error),
+            )
             return JSONResponse({'detail':str(error)},status_code=403)
         stripped = hop | INTERNAL | IDENTITY | {'authorization','cookie','x-forwarded-for','x-forwarded-host','x-forwarded-proto','forwarded'}
         headers = {k: v for k, v in request.headers.items() if k.lower() not in stripped}

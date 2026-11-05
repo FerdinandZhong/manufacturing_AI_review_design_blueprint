@@ -124,7 +124,7 @@ def test_native_actor_overrides_typed_adjudicator(secured):
     assert 'Bearer' not in json.dumps(row)
 
 
-def test_proxy_replaces_internal_identity_and_strips_credentials(secured,monkeypatch):
+def test_proxy_replaces_internal_identity_and_strips_credentials(secured,monkeypatch,caplog):
     root=Path(__file__).parents[2]
     spec=importlib.util.spec_from_file_location('foundation_frontend',root/'03_frontend/start_frontend.py')
     frontend=importlib.util.module_from_spec(spec);spec.loader.exec_module(frontend)
@@ -151,7 +151,15 @@ def test_proxy_replaces_internal_identity_and_strips_credentials(secured,monkeyp
     assert client.get('/api/programs',headers=[('remote-user','a'),('remote-user','b'),('remote-user-perm','RW')]).status_code==403
     assert client.get('/api/programs',headers={**raw,'remote_user':'underscore'}).status_code==403
     monkeypatch.delenv('NPI_TRUSTED_PROXY_CIDRS')
-    assert client.get('/api/programs',headers=raw).status_code==403
+    response=client.get('/api/programs',headers=raw)
+    assert response.status_code==403
+    assert 'NPI_TRUSTED_PROXY_CIDRS' in response.json()['detail']
+    monkeypatch.setenv('NPI_PUBLIC_ORIGIN','')
+    response=client.get('/api/runtime/status',headers=raw)
+    assert response.status_code==403
+    assert 'NPI_PUBLIC_ORIGIN' in response.json()['detail']
+    assert 'peer=10.20.30.40' in caplog.text
+    assert 'Bearer secret' not in caplog.text and 'trusted-forgery' not in caplog.text
 
 
 def test_pilot_readonly_import_and_unavailable_capabilities(secured,monkeypatch,tmp_path):

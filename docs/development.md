@@ -126,3 +126,15 @@ Reference: [Apache Arrow installation requirements](https://arrow.apache.org/doc
 The offline smoke test uses signed, test-owned loopback requests in Workbench mode. AMP can set optional `NPI_PUBLIC_ORIGIN` to an empty string. A previous `setdefault()` preserved that empty value, so the risk endpoint returned HTTP 403 and the smoke test raised `KeyError: scores` while reading the error response. The smoke test now sets a temporary synthetic origin and secret, then restores the exact original deployment values. HTTP errors are checked before response fields are accessed. Real application authorization remains enforced.
 
 After updating the project, rerun `cai_integration/smoke_test.py` (AMP Step 4). No package reinstall or Step 3 regeneration is required for this fix. Success prints `NPI smoke OK: HIGH risk, assets, 5 workers, CONDITIONAL, done`.
+
+
+## Running app: workspace status unavailable
+
+A loaded frontend and HTTP 200 health/root probes do not establish authorized API access. Open the application's `/api/runtime/status` URL and inspect its HTTP status and JSON `detail`. The page now shows this detail and provides Retry; frontend denial logs record the request path, observed socket peer, and reason without credential headers.
+
+For Workbench applications, configure both variables in the Application environment and restart the Application:
+
+- `NPI_PUBLIC_ORIGIN`: the exact external HTTPS origin shown in the application's browser URL, with no path.
+- `NPI_TRUSTED_PROXY_CIDRS`: the verified platform ingress socket peer ranges that reach the frontend. Use the observed peer in denial logs and confirm it belongs to the Workbench ingress. Do not use wildcard ranges or trust forwarded IP headers.
+
+An origin error means the first setting is blank or invalid. An ingress error means the second setting is blank or excludes the actual peer. Missing native identity means the platform ingress is not supplying the expected authenticated user/permission headers; origin/CIDR changes cannot substitute for that identity. Retain Workbench authorization; local_demo is only for local development. The AMP manifest now requires these inputs rather than advertising them as optional.
