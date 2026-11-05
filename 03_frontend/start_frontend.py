@@ -186,14 +186,15 @@ def _run_uvicorn(app, host, port):
     import asyncio
     import threading
     import uvicorn
+    from common.access_logging import server_log_config
 
     try:
         asyncio.get_running_loop()
     except RuntimeError:
-        uvicorn.run(app, host=host, port=port, proxy_headers=False)
+        uvicorn.run(app, host=host, port=port, proxy_headers=False, log_config=server_log_config())
         return
 
-    config = uvicorn.Config(app, host=host, port=port, proxy_headers=False)
+    config = uvicorn.Config(app, host=host, port=port, proxy_headers=False, log_config=server_log_config())
     server = uvicorn.Server(config)
     failures = []
 

@@ -138,3 +138,6 @@ For Workbench applications, configure both variables in the Application environm
 - `NPI_TRUSTED_PROXY_CIDRS`: the verified platform ingress socket peer ranges that reach the frontend. Use the observed peer in denial logs and confirm it belongs to the Workbench ingress. Do not use wildcard ranges or trust forwarded IP headers.
 
 An origin error means the first setting is blank or invalid. An ingress error means the second setting is blank or excludes the actual peer. Missing native identity means the platform ingress is not supplying the expected authenticated user/permission headers; origin/CIDR changes cannot substitute for that identity. Retain Workbench authorization; local_demo is only for local development. The AMP manifest now requires these inputs rather than advertising them as optional.
+
+
+Successful `GET`/`HEAD` probes to `/` and `/api/health` are suppressed in frontend and backend Uvicorn access logs. Other API requests, failed probes, startup errors, and Workbench authorization-denial diagnostics remain visible. The same logging configuration applies to normal and notebook launch paths. Restart the Application after updating the launchers to activate the filter.
