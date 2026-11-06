@@ -11,6 +11,7 @@ FRONTEND_DIR = os.path.join(PROJECT_ROOT, '03_frontend')
 DIST_DIR = os.path.join(FRONTEND_DIR, 'dist')
 sys.path.insert(0, os.path.join(PROJECT_ROOT, '02_backend'))
 _backend_proc = None
+_backend_log = None
 _ingress_secret = ''
 
 
@@ -31,7 +32,7 @@ def _bind_host():
 
 
 def _stop_backend():
-    global _backend_proc
+    global _backend_proc, _backend_log
     if _backend_proc and _backend_proc.poll() is None:
         _backend_proc.terminate()
         try:
@@ -40,26 +41,31 @@ def _stop_backend():
             _backend_proc.kill()
             _backend_proc.wait(timeout=5)
     _backend_proc = None
+    if _backend_log:
+        _backend_log.close()
+        _backend_log = None
 
 
-def _wait_for_backend(port, timeout=30):
+def _wait_for_backend(port, timeout=120):
     import urllib.request
+    # Loopback health checks must not inherit Workbench's HTTP proxy settings.
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         if _backend_proc is not None and _backend_proc.poll() is not None:
-            raise RuntimeError('Backend exited during startup; inspect the application logs')
+            raise RuntimeError('Backend exited during startup; inspect .cai/backend.log')
         try:
-            with urllib.request.urlopen(f'http://127.0.0.1:{port}/api/health', timeout=2) as response:
+            with opener.open(f'http://127.0.0.1:{port}/api/health', timeout=2) as response:
                 if response.status == 200:
                     return
         except OSError:
             pass
         time.sleep(0.5)
-    raise RuntimeError('Backend readiness timed out')
+    raise RuntimeError(f'Backend readiness timed out after {timeout}s on loopback port {port}; inspect .cai/backend.log')
 
 
 def _start_backend(port):
-    global _backend_proc, _ingress_secret
+    global _backend_proc, _backend_log, _ingress_secret
     import socket
     # Fail instead of accidentally connecting to another app's backend.
     with socket.socket() as sock:
@@ -74,9 +80,14 @@ def _start_backend(port):
         env['NPI_LOCAL_ORIGIN'] = 'http://127.0.0.1:'+str(env.get('CDSW_APP_PORT') or env.get('FRONTEND_PORT') or 8100)
     env['BACKEND_PORT'] = str(port)
     env.pop('CDSW_APP_PORT', None)
-    _backend_proc = subprocess.Popen([sys.executable, os.path.join(PROJECT_ROOT, '02_backend/start_backend.py')],
-                                     env=env, cwd=PROJECT_ROOT)
+    log_path = Path(PROJECT_ROOT) / '.cai' / 'backend.log'
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    _backend_log = open(log_path, 'w', buffering=1)
+    os.chmod(log_path, 0o600)
+    print('Backend output: .cai/backend.log', flush=True)
     try:
+        _backend_proc = subprocess.Popen([sys.executable, '-u', os.path.join(PROJECT_ROOT, '02_backend/start_backend.py')],
+                                         env=env, cwd=PROJECT_ROOT, stdout=_backend_log, stderr=subprocess.STDOUT)
         _wait_for_backend(port)
     except Exception:
         _stop_backend()
@@ -117,7 +128,7 @@ def create_app(backend_port):
         _start_backend(backend_port)
         try:
             async with httpx.AsyncClient(base_url=f'http://127.0.0.1:{backend_port}',
-                                         timeout=httpx.Timeout(10, read=None), follow_redirects=False) as client:
+                                         timeout=httpx.Timeout(10, read=None), follow_redirects=False, trust_env=False) as client:
                 app.state.backend = client
                 yield
         finally:

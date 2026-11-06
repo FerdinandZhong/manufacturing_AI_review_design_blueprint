@@ -173,6 +173,31 @@ def test_launcher_fails_on_dead_backend():
         module._wait_for_backend(1)
 
 
+def test_loopback_readiness_ignores_environment_proxy(monkeypatch):
+    import threading
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+    module = load_file('npi_launcher_proxy', '03_frontend/start_frontend.py')
+    class Health(BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b'{"status":"ok"}')
+        def log_message(self, *args):
+            pass
+    with HTTPServer(('127.0.0.1', 0), Health) as server:
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        monkeypatch.setenv('http_proxy', 'http://127.0.0.1:1')
+        monkeypatch.setenv('HTTP_PROXY', 'http://127.0.0.1:1')
+        monkeypatch.setenv('no_proxy', '')
+        monkeypatch.setenv('NO_PROXY', '')
+        try:
+            module._wait_for_backend(server.server_port, timeout=2)
+        finally:
+            server.shutdown()
+            thread.join(timeout=3)
+
+
 def test_installer_preserves_config(tmp_path, monkeypatch):
     module = load_file('npi_installer', '01_installer/install.py')
     monkeypatch.setattr(module, 'PROJECT_ROOT', str(tmp_path))

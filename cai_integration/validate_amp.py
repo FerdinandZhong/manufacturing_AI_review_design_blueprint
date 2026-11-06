@@ -36,8 +36,10 @@ def validate(path: Path = METADATA, project_path: Path = PROJECT) -> dict:
     assert positions == sorted(positions), "AMP tasks must run install → generate → prepare → verify → app"
     app = tasks["Vehicle NPI Platform"]
     assert app.get("subdomain") == "vehicle-npi-platform"
-    assert app.get("environment_variables", {}).get("TASK_TYPE", {}).get("default") == "START_APPLICATION"
-    assert app["environment_variables"]["BACKEND_PORT"]["default"] != "${CDSW_APP_PORT}"
+    app_env = app.get("environment_variables", {})
+    assert all(isinstance(value, str) for value in app_env.values()), 'Application task environment values must be strings, not AMP input descriptors'
+    assert app_env.get("TASK_TYPE") == "START_APPLICATION"
+    assert app_env["BACKEND_PORT"] != "${CDSW_APP_PORT}"
     for name in ('NPI_PUBLIC_ORIGIN', 'NPI_TRUSTED_PROXY_CIDRS'):
         assert data.get('environment_variables', {}).get(name, {}).get('required') is False, f'{name} must not require post-creation information at project setup'
     assert data['environment_variables']['NPI_TRUSTED_PROXY_CIDRS']['default'] == '127.0.0.1/32,::1/128'
@@ -50,7 +52,7 @@ def validate(path: Path = METADATA, project_path: Path = PROJECT) -> dict:
     project_app = project.get("spec", {}).get("application", {})
     assert project_app.get("script") == app["script"], "Project and AMP app scripts must agree"
     assert project_app.get("subdomain") == app["subdomain"], "Project and AMP subdomains must agree"
-    assert project_app.get("environment", {}).get("BACKEND_PORT") == app["environment_variables"]["BACKEND_PORT"]["default"]
+    assert project_app.get("environment", {}).get("BACKEND_PORT") == app_env["BACKEND_PORT"]
     expected_preparation = [tasks[name]["script"] for name in TASK_ORDER[:-1]]
     assert project.get("spec", {}).get("preparation") == expected_preparation, "Project preparation sequence must agree with AMP"
     return data

@@ -123,12 +123,6 @@ tasks:
     memory: 8
     gpu: 0
     environment_variables:
-      TASK_TYPE:
-        default: START_APPLICATION
-        description: "Marks this AMP task as a Workbench Application launch"
-      NPI_APP_MODE:
-        default: "prod"
-        description: "Serve the prepared production React frontend"
-      BACKEND_PORT:
-        default: "7078"
-        description: "Loopback FastAPI port; distinct from CDSW_APP_PORT"
+      TASK_TYPE: "START_APPLICATION"
+      NPI_APP_MODE: "prod"
+      BACKEND_PORT: "7078"
