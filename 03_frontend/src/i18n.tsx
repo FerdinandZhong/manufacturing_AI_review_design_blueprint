@@ -27,12 +27,12 @@ const escaped = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 const phrases = Object.keys(catalog).filter(key => key && key !== catalog[key]).sort((a, b) => b.length - a.length)
 const phrasePattern = new RegExp(`(?<![A-Za-z0-9_])(?:${phrases.map(escaped).join('|')})(?![A-Za-z0-9_])`, 'gi')
 const folded = Object.fromEntries(Object.entries(catalog).map(([key, value]) => [key.toLowerCase(), value]))
-const patterns = [...claims.map(([source, target]) => ({ pattern: new RegExp(source, 'gi'), target })), ...templates.map(([source, target]) => {
+const patterns = [...templates.map(([source, target]) => {
   const pieces = source.split(/(\{\d+\})/)
   const expression = pieces.map((part, index) => /^\{\d+\}$/.test(part)
     ? (index === 1 && !pieces[0] ? '(\\d+)' : '([^\\n]+?)') : escaped(part)).join('')
   return { pattern: new RegExp(`(?<![A-Za-z0-9_])${expression}(?=$|[\\s,;])`, 'g'), target }
-})]
+}), ...claims.map(([source, target]) => ({ pattern: new RegExp(source, 'gi'), target }))]
 const cache = new Map<string, string>()
 
 /** Translate display text only. Keys, IDs, measurements and source records stay canonical. */

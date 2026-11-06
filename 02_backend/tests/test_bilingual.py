@@ -128,3 +128,8 @@ def test_all_accepted_model_claim_forms_have_chinese_output(claim):
     translated=translate_text(claim)
     assert 'Atlas' not in translated and 'study' not in translated
     assert re.findall(r'\[F-[A-Z]+\]',translated)==re.findall(r'\[F-[A-Z]+\]',claim)
+
+
+def test_compound_summary_is_translated_before_short_claims():
+    sentence='Atlas has a MARGINAL thermal bench result [F-TEST] and a HIGH design-risk band [F-RISK].'
+    assert translate_text(sentence)=='阿特拉斯的热台架结果为临界 [F-TEST]，设计风险等级为高 [F-RISK]。'

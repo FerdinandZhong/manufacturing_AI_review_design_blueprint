@@ -24,7 +24,7 @@ def compile_template(template):
                          for i,part in enumerate(pieces))
     return re.compile(r'(?<![A-Za-z0-9_])'+expression+r'(?=$|[\s,;])')
 
-PATTERNS = [(re.compile(source,re.I),target) for source,target in json.loads((ROOT/'shared/locales/claims.json').read_text())] + [(compile_template(source),target) for source,target in TEMPLATES]
+PATTERNS = [(compile_template(source),target) for source,target in TEMPLATES] + [(re.compile(source,re.I),target) for source,target in json.loads((ROOT/'shared/locales/claims.json').read_text())]
 DISPLAY_FIELDS = {'name','title','text','caption','caption_text','description','rationale','corrective_action',
                   'change','origin','source','provenance','rule','principle','definition','boundary',
                   'unit_constraints','label','detail','message','limitations','note','answer','findings',
