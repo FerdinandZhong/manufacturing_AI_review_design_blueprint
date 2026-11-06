@@ -1,4 +1,4 @@
-"""Native Workbench identity with a signed, process-owned loopback hop."""
+"""Workbench browser/key identity with a signed, process-owned loopback hop."""
 import os
 import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -9,6 +9,7 @@ import json
 import re
 from urllib.parse import urlsplit
 from common.runtime import auth_mode
+from common.workbench_key import validate_key
 
 INTERNAL = {'x-npi-actor','x-npi-permission','x-npi-auth-kind','x-npi-proof'}
 IDENTITY = {'remote-user','remote-user-perm','remote_user','remote_user_perm'}
@@ -48,28 +49,43 @@ def sign(secret, actor, permission, kind, method, path, origin):
 
 
 def forwarded_identity(request, secret):
-    """Accept native headers only from the configured Workbench proxy socket."""
+    """Validate bearer callers; accept browser identity only from the trusted proxy."""
     if auth_mode() == 'local_demo':
         return {}
     public_origin()
     if not proxy_is_trusted(request.client.host if request.client else ''):
         raise PermissionError('Untrusted Workbench ingress; verify NPI_TRUSTED_PROXY_CIDRS against the platform ingress peers')
+    if any(name in request.headers for name in ('remote_user','remote_user_perm')):
+        raise PermissionError('Ambiguous native Workbench identity')
+    authorizations = request.headers.getlist('authorization')
+    if authorizations:
+        if len(authorizations) != 1:
+            raise PermissionError('Ambiguous Workbench bearer credential')
+        match = re.fullmatch(r'Bearer ([\x21-\x7e]+)', authorizations[0], re.IGNORECASE)
+        if not match:
+            raise PermissionError('Invalid Workbench bearer credential')
+        actor, permission = validate_key(match.group(1))
+        kind = 'machine'
+    else:
+        actor, permission = native_identity(request)
+        kind = 'browser'
+    origin = request.headers.get('origin','')
+    path = request.url.path + ('?'+request.url.query if request.url.query else '')
+    return {'x-npi-actor':actor,'x-npi-permission':permission,'x-npi-auth-kind':kind,
+            'x-npi-proof':sign(secret,actor,permission,kind,request.method,path,origin)}
+
+
+def native_identity(request):
     values = {}
     for name in ('remote-user','remote-user-perm'):
         native = request.headers.getlist(name)
         if len(native) != 1 or not native[0] or any(ord(c)<32 for c in native[0]):
             raise PermissionError('Missing or ambiguous native Workbench identity')
         values[name] = native[0]
-    if any(name in request.headers for name in ('remote_user','remote_user_perm')):
-        raise PermissionError('Ambiguous native Workbench identity')
     actor, permission = values['remote-user'], values['remote-user-perm']
     if len(actor)>256 or permission not in {'RO','RW'}:
         raise PermissionError('Workbench access is unauthorized')
-    kind = 'machine' if request.headers.get('authorization','').lower().startswith('bearer ') else 'browser'
-    origin = request.headers.get('origin','')
-    path = request.url.path + ('?'+request.url.query if request.url.query else '')
-    return {'x-npi-actor':actor,'x-npi-permission':permission,'x-npi-auth-kind':kind,
-            'x-npi-proof':sign(secret,actor,permission,kind,request.method,path,origin)}
+    return actor, permission
 
 
 def authenticated_actor(request):

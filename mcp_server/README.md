@@ -9,7 +9,7 @@ it does not need the engineering data files or backend Python dependencies.
 Localhost works only if the API and MCP process share a network namespace.
 For a separate CAI Studio/agent workload, use the reachable Workbench Application
 URL and its supported machine authentication mechanism. Configure the required
-application bearer token as `NPI_API_BEARER_TOKEN`; the adapter sends it on every
+application bearer token as `CDSW_APIV2_KEY`; the adapter sends it on every
 application request as `Authorization: Bearer <token>`. The current deployment
 redirects unauthenticated requests to Workbench SSO. A bearer token cannot bypass
 an unsupported Workbench ingress path, so the Agent Studio runtime must have the
@@ -68,7 +68,7 @@ The package lives in `mcp_server`, so keep the `#subdirectory=mcp_server` suffix
       "args": ["--from", "git+https://github.com/FerdinandZhong/manufacturing_AI_review_design_blueprint.git@main#subdirectory=mcp_server", "npi-mcp"],
       "env": {
         "NPI_API_BASE_URL": "https://vehicle-npi-platform-h4ipg8.ml-c5697ef8-0c9.qzhong-a.a465-9q4k.cloudera.site/api",
-        "NPI_API_BEARER_TOKEN": "<application-bearer-token>"
+        "CDSW_APIV2_KEY": "<workbench-api-key>"
       }
     }
   }
@@ -91,38 +91,39 @@ An error such as `Updating ... (COMMIT)` followed by `Failed to resolve
 the unchanged configuration cannot fix that missing revision. A Git install
 failure happens before MCP initialization or any application API request.
 
-The configured application URL is this demo deployment; change it when using
-another deployment. Set `NPI_API_BEARER_TOKEN` to the application bearer token.
-`NPI_API_TOKEN` remains a backwards-compatible alias. Either may contain a raw
-token or `Bearer <token>`; the adapter always emits exactly one Bearer prefix.
-Never use the CAI API-v2 deployment key or send a literal placeholder.
-
-The client must be able to launch stdio processes and authenticate to the
-private Workbench Application. `NPI_API_BEARER_TOKEN` is sent only to the
-configured application origin; it is not a substitute for Workbench SSO and is
-never the API v2 deployment key. Tool errors intentionally omit tokens and
-upstream response bodies. HTTP 401/403 errors explicitly distinguish a missing
-token from a rejected one without exposing the token value.
+The configured application URL is an example; change it for your deployment.
+Set only `CDSW_APIV2_KEY` as the MCP credential. Raw keys and `Bearer <key>` both work.
+Do not pass a literal placeholder or `${CDSW_APIV2_KEY}` as the value.
+The adapter accepts `NPI_API_BEARER_TOKEN` and `NPI_API_TOKEN` only as legacy fallbacks.
+An explicit `CDSW_APIV2_KEY` takes precedence over both aliases.
 
 ## Private Workbench authentication
 
-Use the private Application URL as `NPI_API_BASE_URL`, including `/api`.
-Create a Workbench API key with the **Application** audience.
-Set `NPI_API_BEARER_TOKEN` in the MCP host's secret environment.
-The adapter sends `Authorization: Bearer <key>` to the Application ingress.
-It never forwards native identity headers or calls the loopback backend directly.
-A CAI Inferencing JWT, `/tmp/jwt`, and an API-v2-only key are not substitutes.
-The legacy `NPI_API_TOKEN` name remains a compatibility alias for the same Application key.
+Keep the Application private and use its HTTPS URL ending in `/api`.
+The same Workbench key must pass Application ingress and authorize the API v2 project lookup.
+For newly issued keys, select **Application** and **API** audiences.
+The MCP process sends `Authorization: Bearer <key>`. It never supplies native identity headers.
+The frontend validates that exact caller key through `POST /api/v2/auth/validate_key` with audience `API`.
+It takes the authenticated username from that response.
+It then checks `GET /api/v2/projects/{CDSW_PROJECT_ID}` on `CDSW_DOMAIN`.
+It does not compare keys with a server environment variable or substitute the app owner's key.
 
-Workbench validates the key and injects its native identity and permission.
-RO users can inspect records. RW permission is required to trigger persisted reviews.
-The application records the trusted actor; MCP cannot supply or elevate that actor.
-A 401/403 or SSO redirect is an authentication/configuration failure, not an empty result.
-Browser requests also require same-origin mutation checks. Adding an arbitrary Bearer header cannot bypass a conflicting Origin.
+The project response must identify the configured project and grant `read: true`.
+Explicit `write: true` or `admin: true` grants RW; otherwise the caller remains RO.
+Each request revalidates permissions. Redirects, invalid keys, missing permissions and platform failures fail closed.
+The machine audit actor is the username verified by Workbench, not a client claim or the project owner.
+Raw keys never enter audit records or tool errors.
+The signed loopback hop and existing mutation checks remain enforced.
+Browser requests retain native Workbench identity and same-origin mutation checks.
+
+The client sends its key only to the configured application. The application sends it only to its configured Workbench origin.
+A CAI Inference JWT or `/tmp/jwt` is not a Workbench API key.
+A 401/403 or SSO redirect is an access failure, not an empty result.
+The adapter's generic rejection message can represent ingress rejection or application permission denial.
 
 Pilot mode exposes only validated read-only imports at this milestone.
 Pilot review, synthetic risk, demo knowledge, and demo semantic tools remain unavailable.
-Remote key validation, native-header sanitization, and deployed participant permissions remain acceptance checks.
+Validate actual tool calls with participant permissions before a workshop. Discovery alone does not access the application.
 
 Official references: [Application security](https://docs.cloudera.com/machine-learning/cloud/applications/topics/ml-securing-applications.html), [API keys and Application audience](https://docs.cloudera.com/machine-learning/cloud/api/topics/ml-api-v2.html).
 

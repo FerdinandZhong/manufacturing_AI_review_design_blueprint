@@ -69,12 +69,18 @@ The snapshot identity hashes validated canonical source content. Extraction time
 
 Workbench remains the sole user directory and permission authority.
 The Application must remain private with authentication enabled.
-Native `REMOTE-USER` and `REMOTE-USER-PERM` supply the actor and RO/RW permission.
+For browsers, native `REMOTE-USER` and `REMOTE-USER-PERM` supply the actor and RO/RW permission.
+For machine requests, the frontend validates the bearer key against the configured Workbench project.
+The MCP client needs only `CDSW_APIV2_KEY`; the server never uses its own key to authorize a caller.
+Validation requires a matching project ID and explicit read permission. Explicit write or admin permission grants RW.
+Workbench `POST /api/v2/auth/validate_key` with audience `API` supplies the verified machine username.
+Keys and permissions are revalidated on every request. Invalid keys and unavailable validation fail closed.
 No application login, user database, or custom role mapping exists.
 
 ```text
 Private Workbench Application ingress
-  native user + RO/RW (platform must sanitize caller identity headers)
+  browser native identity OR caller bearer key
+  bearer key -> fixed Workbench project API -> current permissions + verified username
                 |
 Frontend socket peer matched against configured proxy CIDRs
   reject duplicate/underscore native identities
@@ -123,10 +129,10 @@ NiFi reads never mutate NiFi.
 Cross-origin mutations fail even when a caller adds an arbitrary Bearer header.
 Browser writes require the configured same Origin, or a matching Referer plus the application request marker for GET streams.
 Cross-site Fetch Metadata also fails. No permissive CORS middleware is installed.
-Originless machine requests are accepted only after the native Workbench ingress identity and internal proof pass.
+Originless machine requests are accepted only after Workbench key validation and the internal proof pass.
 Bearer and Cookie credentials terminate at the frontend and never enter backend audit payloads.
 
-Audit records contain actor, native permission, method, route, status, and outcome.
+Audit records contain actor, verified permission, method, route, status, and outcome.
 The application records verified authorization denials when the audit store is available.
 An authorized mutation fails closed when it cannot record its audit attempt.
 SSE audits say `stream_accepted`; they do not claim completion before streaming finishes.

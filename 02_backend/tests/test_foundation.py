@@ -140,12 +140,13 @@ def test_proxy_replaces_internal_identity_and_strips_credentials(secured,monkeyp
     proxy=frontend.create_app(7100)
     proxy.state.backend=httpx.AsyncClient(transport=httpx.MockTransport(backend),base_url='http://127.0.0.1:7100')
     client=TestClient(proxy,client=('10.20.30.40',5000))
+    monkeypatch.setattr('common.security.validate_key', lambda token: ('validated-key', 'RO'))
     raw={'REMOTE-USER':'native','REMOTE-USER-PERM':'RO','x-npi-actor':'forged','x-npi-proof':'forged','Authorization':'Bearer secret','Cookie':'secret','X-Forwarded-For':'trusted-forgery'}
     assert client.get('/api/programs',headers=raw).status_code==200
     sent=seen[0]
-    assert sent.headers['x-npi-actor']=='native' and sent.headers['x-npi-permission']=='RO'
+    assert sent.headers['x-npi-actor']=='validated-key' and sent.headers['x-npi-permission']=='RO'
     assert all(k not in sent.headers for k in ('authorization','cookie','remote-user','remote-user-perm','x-forwarded-for'))
-    assert sent.headers['x-npi-proof']==sign(SECRET,'native','RO','machine','GET','/api/programs','')
+    assert sent.headers['x-npi-proof']==sign(SECRET,'validated-key','RO','machine','GET','/api/programs','')
     untrusted=TestClient(proxy,client=('10.20.30.41',5000))
     assert untrusted.get('/api/programs',headers=raw).status_code==403
     assert client.get('/api/programs',headers=[('remote-user','a'),('remote-user','b'),('remote-user-perm','RW')]).status_code==403

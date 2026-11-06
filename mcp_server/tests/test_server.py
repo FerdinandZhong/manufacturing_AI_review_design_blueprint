@@ -9,6 +9,21 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from npi_mcp import server
 
 
+@pytest.fixture(autouse=True)
+def clear_key_environment(monkeypatch):
+    for name in ('CDSW_APIV2_KEY', 'NPI_API_BEARER_TOKEN', 'NPI_API_TOKEN'):
+        monkeypatch.delenv(name, raising=False)
+
+
+def test_single_workbench_key_takes_precedence(monkeypatch):
+    monkeypatch.setenv("CDSW_APIV2_KEY", "Bearer workbench-key")
+    monkeypatch.setenv("NPI_API_BEARER_TOKEN", "stale-alias")
+    assert server._headers() == {"Authorization": "Bearer workbench-key"}
+    monkeypatch.setenv("CDSW_APIV2_KEY", "bad key")
+    with pytest.raises(RuntimeError, match="whitespace"):
+        server._headers()
+
+
 def test_base_url_and_token(monkeypatch):
     monkeypatch.setenv("NPI_API_BASE_URL", "https://npi.example.com/api/")
     monkeypatch.setenv("NPI_API_BEARER_TOKEN", "Bearer token-value")

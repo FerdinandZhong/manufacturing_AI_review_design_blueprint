@@ -68,9 +68,10 @@ DVP&R results, traceability, knowledge metadata, saved reviews/evidence, and
 one mutating `trigger_gate_review` tool. Gate approval and model configuration
 remain in the cockpit.
 
-The target client needs a verified route and authentication method to the
-private Application. `CML_API_KEY` only controls API-v2 deployment automation;
-it must never be used as `NPI_API_TOKEN` or included in MCP configuration.
+The MCP client uses `CDSW_APIV2_KEY` as its only credential setting.
+The same key must reach the private Application and authorize API v2 access to this project.
+The application validates the caller key, project identity, and current permissions on each request.
+Use a participant-scoped key for the workshop; the app never substitutes its deployment credential.
 
 ## Acceptance and troubleshooting
 

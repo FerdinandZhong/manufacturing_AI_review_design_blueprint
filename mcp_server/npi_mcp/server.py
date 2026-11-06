@@ -29,13 +29,13 @@ def _base_url() -> str:
 def _headers() -> dict[str, str]:
     """Return the application bearer header without ever logging its token.
 
-    ``NPI_API_BEARER_TOKEN`` is the explicit configuration name.  The original
-    ``NPI_API_TOKEN`` remains a compatibility alias for existing clients.
-    Use a Workbench API key with Application audience at the private app URL.
-    Either value may be supplied raw or as ``Bearer <key>``.
+    ``CDSW_APIV2_KEY`` is the single credential setting.
+    Old NPI token names remain fallback aliases for existing clients.
+    The key must reach the private app and authorize Workbench project lookup.
+    The value may be supplied raw or as ``Bearer <key>``.
     A CAI inference JWT is not an Application API key.
     """
-    token = (os.environ.get("NPI_API_BEARER_TOKEN") or os.environ.get("NPI_API_TOKEN") or "").strip()
+    token = (os.environ.get("CDSW_APIV2_KEY") or os.environ.get("NPI_API_BEARER_TOKEN") or os.environ.get("NPI_API_TOKEN") or "").strip()
     if token.lower().startswith("bearer "):
         token = token[7:].strip()
     if not token:
@@ -63,7 +63,7 @@ def _request(method: str, path: str, *, params: dict | None = None, payload: dic
         detail = "was rejected" if configured else "is not configured"
         raise RuntimeError(
             f"NPI API requires bearer authentication (HTTP {response.status_code}); "
-            f"NPI_API_BEARER_TOKEN {detail}"
+            f"CDSW_APIV2_KEY {detail}"
         )
     if not 200 <= response.status_code < 300:
         raise RuntimeError(f"NPI API returned HTTP {response.status_code}")

@@ -132,7 +132,7 @@ def create_app(backend_port):
             return JSONResponse({'detail': 'Backend unavailable'}, status_code=503)
         from common.security import forwarded_identity, INTERNAL, IDENTITY
         try:
-            identity = forwarded_identity(request,_ingress_secret)
+            identity = await asyncio.to_thread(forwarded_identity, request, _ingress_secret)
         except (PermissionError,ValueError,RuntimeError) as error:
             import logging
             logging.getLogger('npi.frontend').warning(
