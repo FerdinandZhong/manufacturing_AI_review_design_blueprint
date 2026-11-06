@@ -37,3 +37,20 @@ Do not translate identifiers or alter source records to change their display lan
 
 Run `python -m pytest 02_backend/tests mcp_server/tests -q` and `npm run build --prefix 03_frontend`.
 Use the AMP preparation tasks from a clean checkout to check packaging.
+
+## Verified release
+
+The implementation passed 273 backend and MCP tests and the production frontend build.
+Browser checks covered every workspace page, table details, streamed review reports,
+semantic explanations, all four NiFi inspection types, and persistent language switching.
+Switching languages did not submit another review.
+
+A clean Python 3.11 checkout passed generation, preparation, and the AMP smoke test.
+A separate private Workbench AMP installation also completed and started its application.
+Its health, identity, test results, risk scores, knowledge search, and Chinese NiFi endpoint passed.
+The test application was stopped after verification; its project retains the evidence.
+The original vehicle application remains deployed with the bilingual build.
+
+Live API and stdio MCP checks used only `CDSW_APIV2_KEY` for authentication.
+Chinese domain queries returned Chinese presentation text with unchanged identifiers and scores.
+Missing credentials returned the Workbench login redirect; invalid credentials were rejected.

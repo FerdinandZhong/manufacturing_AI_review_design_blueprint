@@ -75,10 +75,6 @@ def test_stream_localizes_split_utf8_and_keeps_protocol_fields():
     asyncio.run(run())
 
 
-if __name__=='__main__':
-    assert translate_text('Ready') != 'Ready'
-
-
 def test_api_chinese_queries_and_output_preserve_evidence(monkeypatch):
     from common import db
     from engineering.test_bench import run_test_bench
@@ -133,3 +129,7 @@ def test_all_accepted_model_claim_forms_have_chinese_output(claim):
 def test_compound_summary_is_translated_before_short_claims():
     sentence='Atlas has a MARGINAL thermal bench result [F-TEST] and a HIGH design-risk band [F-RISK].'
     assert translate_text(sentence)=='阿特拉斯的热台架结果为临界 [F-TEST]，设计风险等级为高 [F-RISK]。'
+
+
+if __name__=='__main__':
+    assert translate_text('Ready') != 'Ready'
