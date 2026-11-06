@@ -96,6 +96,11 @@ def main():
                 assert events and events[-1]['type'] == 'done', 'Review stream did not complete'
                 assert sum(e['type'] == 'worker_done' for e in events) == 5
                 assert [e['value'] for e in events if e['type'] == 'recommendation'] == ['CONDITIONAL']
+                chinese = require_ok(client.get('/api/review/PACK-ATLAS-01/stream?review_id=REV-DEPLOY-SMOKE&lang=zh'))
+                assert '有条件通过' in chinese.text and '关卡审查' in chinese.text
+                inspection = require_ok(client.post('/api/nifi/ask', json={'question':'当前管道运行状态如何？','mode':'sample'}))
+                assert inspection.headers['content-language'] == 'zh-CN'
+                assert inspection.json()['snapshot']['name'] == '电池测试证据摄取'
     finally:
         for name,value in [('NPI_INGRESS_SECRET',previous_secret),('NPI_PUBLIC_ORIGIN',previous_origin)]:
             if value is None:
@@ -104,7 +109,7 @@ def main():
                 os.environ[name]=value
         db.get_db_path = previous
         workers.chat, narrative.chat = worker_chat, narrative_chat
-    print('NPI smoke OK: HIGH risk, assets, 5 workers, CONDITIONAL, done')
+    print('NPI smoke OK: HIGH risk, assets, 5 workers, CONDITIONAL, bilingual reports and NiFi, done')
 
 
 if __name__ == '__main__':

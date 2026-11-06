@@ -135,6 +135,8 @@ def search(query: str, ontology_filter: str | None = None, k: int = 5, external_
     ponytail: brute-force cosine, add a Lance vector index only if N grows
     past a few thousand rows."""
     import json
+    from common.i18n import normalize_query
+    query = normalize_query(query)
     query_tokens = _tokens(query)
     if not query_tokens or k <= 0:
         return []

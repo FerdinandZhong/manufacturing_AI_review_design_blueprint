@@ -126,3 +126,9 @@ Validate actual tool calls with participant permissions before a workshop. Disco
 Official references: [Application security](https://docs.cloudera.com/machine-learning/cloud/applications/topics/ml-securing-applications.html), [API keys and Application audience](https://docs.cloudera.com/machine-learning/cloud/api/topics/ml-api-v2.html).
 
 MCP tests are an explicit development/release check: `python -m pytest mcp_server/tests -q`. Operational preparation installs the adapter but never runs its demo integration fixtures under Pilot mode. Run release tests only in an isolated local Demo test environment.
+
+### Language
+
+Set optional `NPI_LANGUAGE=zh` for Chinese presentation text, or `en` for English.
+Chinese knowledge and engineering search arguments are supported without this setting.
+`CDSW_APIV2_KEY` remains the sole authentication credential.

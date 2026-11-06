@@ -11,7 +11,7 @@ from npi_mcp import server
 
 @pytest.fixture(autouse=True)
 def clear_key_environment(monkeypatch):
-    for name in ('CDSW_APIV2_KEY', 'NPI_API_BEARER_TOKEN', 'NPI_API_TOKEN'):
+    for name in ('CDSW_APIV2_KEY', 'NPI_API_BEARER_TOKEN', 'NPI_API_TOKEN', 'NPI_LANGUAGE'):
         monkeypatch.delenv(name, raising=False)
 
 
@@ -88,3 +88,19 @@ def test_program_path_encodes_input():
     assert server._program_path("PACK/ATLAS") == "/programs/PACK%2FATLAS"
     with pytest.raises(ValueError):
         server._program_path("")
+
+
+def test_language_uses_same_single_auth_key(monkeypatch):
+    monkeypatch.setenv('NPI_API_BASE_URL','https://npi.example.com/api')
+    monkeypatch.setenv('CDSW_APIV2_KEY','test-key')
+    monkeypatch.setenv('NPI_LANGUAGE','zh')
+    class FakeClient:
+        def __init__(self,**kwargs):pass
+        def __enter__(self):return self
+        def __exit__(self,*args):return False
+        def request(self,method,url,**kwargs):
+            assert kwargs['headers']=={'Authorization':'Bearer test-key','Accept-Language':'zh-CN'}
+            assert kwargs['params']['q']=='热隔离'
+            return httpx.Response(200,json=[])
+    monkeypatch.setattr(server.httpx,'Client',FakeClient)
+    assert server.search_knowledge('热隔离')==[]

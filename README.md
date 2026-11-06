@@ -170,3 +170,8 @@ The traditional ML model uses historical requirement and design features to prod
 - [Demo storyline](docs/demo_storyline.md)
 - [CAI Workbench deployment plan](docs/workbench-deployment-plan.md)
 - [Iceberg and Lance lakehouse enhancement plan](docs/iceberg-lance-lakehouse-plan.md)
+
+### English / 简体中文
+
+The header language switch covers the interface, scenario details, reports, and NiFi inspection.
+Chinese domain queries are accepted by the API and MCP server. See [bilingual support](docs/bilingual.md).

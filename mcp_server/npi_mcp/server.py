@@ -46,11 +46,17 @@ def _headers() -> dict[str, str]:
 
 
 def _request(method: str, path: str, *, params: dict | None = None, payload: dict | None = None) -> dict | list:
+    headers = _headers()
+    language = os.environ.get('NPI_LANGUAGE', '').strip().lower()
+    if language:
+        if language not in {'en', 'zh', 'zh-cn'}:
+            raise RuntimeError('NPI_LANGUAGE must be en or zh')
+        headers['Accept-Language'] = 'zh-CN' if language.startswith('zh') else 'en'
     try:
         with httpx.Client(timeout=_TIMEOUT, follow_redirects=False) as client:
             response = client.request(method, _base_url() + path,
                                       params={k: v for k, v in (params or {}).items() if v is not None},
-                                      json=payload, headers=_headers())
+                                      json=payload, headers=headers)
     except httpx.HTTPError as exc:
         raise RuntimeError("NPI API is unavailable") from None
     if 300 <= response.status_code < 400:

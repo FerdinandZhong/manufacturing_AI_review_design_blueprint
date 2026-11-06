@@ -4,9 +4,9 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from typing import Literal
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from knowledge import semantic
 
 router = APIRouter(prefix='/api/semantic', tags=['Semantic context'])
@@ -17,6 +17,7 @@ class ExplainRequest(BaseModel):
     narration: Literal['template', 'model'] = 'template'
     include_images: bool = False
     program_id: str = 'PACK-ATLAS-01'
+    question: str | None = Field(default=None, max_length=500)
 
 
 @router.get('/model')
@@ -35,9 +36,12 @@ def context(question_id: Literal['thermal', 'packaging', 'venting', 'applicabili
 
 
 @router.post('/explain')
-def explain(body: ExplainRequest):
+def explain(body: ExplainRequest, request: Request):
     try:
-        return semantic.explain(body.question_id, body.narration, body.include_images, body.program_id)
+        from common.i18n import request_language, semantic_intent
+        question_id = semantic_intent(body.question) if body.question else body.question_id
+        request.scope['npi.language'] = request_language(request.scope,body.question or '')
+        return semantic.explain(question_id, body.narration, body.include_images, body.program_id)
     except KeyError:
         raise HTTPException(404, 'Unknown program or predefined question') from None
     except FileNotFoundError:

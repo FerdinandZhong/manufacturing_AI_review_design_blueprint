@@ -1,0 +1,238 @@
+[
+  [
+    "Gate review for {0}: recommendation {1}.",
+    "项目 {0} 的关卡审查：建议为{1}。"
+  ],
+  [
+    "{0} of 5 findings collected.",
+    "已收集 5 项发现中的 {0} 项。"
+  ],
+  [
+    "{0} of {1} requirements have design and test links ({2}% coverage).",
+    "{1} 项需求中有 {0} 项具备设计和测试关联（覆盖率 {2}%）。"
+  ],
+  [
+    "Validation results: {0} PASS, {1} MARGINAL, {2} FAIL.",
+    "验证结果：{0} 项通过，{1} 项临界，{2} 项不通过。"
+  ],
+  [
+    "The recommendation is driven by {0}.",
+    "建议依据：{0}。"
+  ],
+  [
+    "{0} failed validation tests",
+    "{0} 项验证测试不通过"
+  ],
+  [
+    "{0} marginal validation result(s)",
+    "{0} 项验证结果处于临界状态"
+  ],
+  [
+    "{0} requirements with incomplete coverage",
+    "{0} 项需求覆盖不完整"
+  ],
+  [
+    "{0} missing required standard(s)",
+    "缺少 {0} 项必需标准"
+  ],
+  [
+    "Tests needing attention: {0}.",
+    "需要关注的测试：{0}。"
+  ],
+  [
+    "{0} requirements still need complete design and test links; inspect Coverage findings for their IDs.",
+    "仍有 {0} 项需求需要补齐设计和测试关联；请在覆盖情况中查看其标识。"
+  ],
+  [
+    "Missing test-plan standards: {0}.",
+    "测试计划缺少的标准：{0}。"
+  ],
+  [
+    "The model flags {0} of {1} scored requirements as HIGH risk.",
+    "模型在 {1} 项已评分需求中标记了 {0} 项高风险需求。"
+  ],
+  [
+    "The highest-scored requirement is {0}, with a {1}% predicted risk score ({2}).",
+    "评分最高的需求为 {0}，预测风险分数为 {1}%（{2}）。"
+  ],
+  [
+    "Retrieved {0} supporting sources.",
+    "已检索到 {0} 个支持性来源。"
+  ],
+  [
+    "The strongest match is {0} [{1}], with relevance {2} on a 0–1 scale.",
+    "最相关的来源为 {0} [{1}]，相关度为 {2}（范围 0–1）。"
+  ],
+  [
+    "Verification test: {0} [{1}].",
+    "验证测试：{0} [{1}]。"
+  ],
+  [
+    "Review workers unavailable: {0}. Inspect the retained evidence before deciding.",
+    "不可用的审查智能体：{0}。请在决策前检查保留的证据。"
+  ],
+  [
+    "Traceability coverage for {0}: {1}% ({2}/{3} requirements traced).",
+    "项目 {0} 的可追溯覆盖率：{1}%（已关联 {2}/{3} 项需求）。"
+  ],
+  [
+    "Coverage gaps: {0}.",
+    "覆盖缺口：{0}。"
+  ],
+  [
+    "{0} requirements checked against design specs and test plans.",
+    "已根据设计规格和测试计划检查 {0} 项需求。"
+  ],
+  [
+    "Test verdicts for {0}: {1}.",
+    "项目 {0} 的测试判定：{1}。"
+  ],
+  [
+    "Flagged (MARGINAL/FAIL) tests: {0}.",
+    "已标记的测试（临界／不通过）：{0}。"
+  ],
+  [
+    "{0} total test results reviewed.",
+    "共审查 {0} 项测试结果。"
+  ],
+  [
+    "EV-battery standards compliance for {0}: missing coverage for {1}.",
+    "项目 {0} 的电动汽车电池标准覆盖：缺少 {1} 的覆盖。"
+  ],
+  [
+    "Required standards: {0}.",
+    "必需标准：{0}。"
+  ],
+  [
+    "{0}/{1} required standards covered.",
+    "已覆盖 {0}/{1} 项必需标准。"
+  ],
+  [
+    "Test-plan standards coverage for {0}: all required standards linked.",
+    "项目 {0} 的测试计划标准覆盖：已关联全部必需标准。"
+  ],
+  [
+    "Design risk assessment for {0}: {1} scored {2} ({3}), global model feature ranking starts with {4}.",
+    "项目 {0} 的设计风险评估：{1} 得分为 {2}（{3}），全局模型特征排名首位为 {4}。"
+  ],
+  [
+    "Model explanation top drivers: {0}.",
+    "模型解释的主要影响因素：{0}。"
+  ],
+  [
+    "{0} requirement(s) scored for design risk.",
+    "已对 {0} 项需求进行设计风险评分。"
+  ],
+  [
+    "Design risk assessment for {0}: no current requirement scores available.",
+    "项目 {0} 的设计风险评估：当前没有可用的需求评分。"
+  ],
+  [
+    "Knowledge reuse for {0}: top hit asset {1} (ontology_class={2}), linked to {3}.",
+    "项目 {0} 的知识复用：首位匹配资产 {1}（本体类别={2}），关联到 {3}。"
+  ],
+  [
+    "Title: {0}.",
+    "标题：{0}。"
+  ],
+  [
+    "{0} related asset(s) found for requirement-driven design reuse.",
+    "为需求驱动的设计复用找到 {0} 项相关资产。"
+  ],
+  [
+    "Knowledge reuse for {0}: no related assets found for requirement-driven query.",
+    "项目 {0} 的知识复用：需求驱动的查询未找到相关资产。"
+  ],
+  [
+    "Atlas has a {0} thermal bench result [F-TEST] and a {1} design-risk band [F-RISK].",
+    "阿特拉斯的热台架结果为{0} [F-TEST]，设计风险等级为{1} [F-RISK]。"
+  ],
+  [
+    "The external study contributes {0} published experiments with peak cell temperatures from {1} to {2} °C [{3}:Table 2].",
+    "外部研究提供了 {0} 项已发表实验，电芯峰值温度范围为 {1} 至 {2} °C [{3}:Table 2]。"
+  ],
+  [
+    "Atlas has a {0} thermal result [F-TEST].",
+    "阿特拉斯的热测试结果为{0} [F-TEST]。"
+  ],
+  [
+    "Atlas shows a {0} thermal risk band [F-RISK].",
+    "阿特拉斯的热风险等级为{0} [F-RISK]。"
+  ],
+  [
+    "Atlas specifies a thermal target of {0} [F-REQ].",
+    "阿特拉斯规定的热目标为 {0} [F-REQ]。"
+  ],
+  [
+    "The external study reports {0} published experiments [F-REF].",
+    "外部研究报告了 {0} 项已发表实验 [F-REF]。"
+  ],
+  [
+    "Use predefined concept: {0}.",
+    "使用预定义概念：{0}。"
+  ],
+  [
+    "Atlas thermal target ({0})",
+    "阿特拉斯热目标（{0}）"
+  ],
+  [
+    "Generated validation report {0}: {1}; {2}; {3}",
+    "生成的验证报告 {0}：{1}；{2}；{3}"
+  ],
+  [
+    "{0} failed · {1} marginal",
+    "{0} 项不通过 · {1} 项临界"
+  ],
+  [
+    "{0} computed test results reviewed",
+    "已审查 {0} 项计算测试结果"
+  ],
+  [
+    "{0}% · {1} of {2} covered",
+    "{0}% · 已覆盖 {1}/{2} 项"
+  ],
+  [
+    "{0} requirements need design or test links",
+    "{0} 项需求需要设计或测试关联"
+  ],
+  [
+    "{0} standards missing from test plans",
+    "测试计划缺少 {0} 项标准"
+  ],
+  [
+    "{0} retained bulletins were returned for {1}.",
+    "已返回 {1} 的 {0} 条保留公告。"
+  ],
+  [
+    "{0} direct child processors are not running or report invalid configuration.",
+    "{0} 个直接子处理器未运行或报告了无效配置。"
+  ],
+  [
+    "The current flow contains {0} visible direct child processors and {1} connections.",
+    "当前流程包含 {0} 个可见的直接子处理器和 {1} 条连接。"
+  ],
+  [
+    "{0} of {1} visible processors are running, with {2} FlowFiles queued.",
+    "{1} 个可见处理器中有 {0} 个正在运行，队列中有 {2} 个流文件。"
+  ],
+  [
+    "Group {0}",
+    "组 {0}"
+  ],
+  [
+    "Inspect {0}",
+    "查看 {0}"
+  ],
+  [
+    "Preview {0}",
+    "预览 {0}"
+  ],
+  [
+    "Updated \"{0}\".",
+    "已更新“{0}”。"
+  ],
+  [
+    "Registered \"{0}\" — now active. The agents will use it.",
+    "已注册“{0}”并启用。智能体将使用此模型。"
+  ]
+]

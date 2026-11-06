@@ -56,6 +56,8 @@ from common.access import enforce_access
 from common.providers import SourceUnavailable
 from common.runtime import data_mode, auth_mode
 app.middleware('http')(enforce_access)
+from common.localization import LocalizationMiddleware
+app.add_middleware(LocalizationMiddleware)
 
 @app.exception_handler(SourceUnavailable)
 async def unavailable_source(request, error):
@@ -164,7 +166,7 @@ class QueryPage(BaseModel):
 
 @app.get('/api/programs/{pid}/data/{dataset}', response_model=QueryPage,
          tags=['Engineering queries'], summary='Query requirements, designs, BOM, plans or stored test results')
-def query_program_data(pid: str, dataset: Literal['requirements', 'design', 'bom', 'test_plans', 'test_results', 'observations', 'issues', 'history'],
+def query_program_data(pid: str, request: Request, dataset: Literal['requirements', 'design', 'bom', 'test_plans', 'test_results', 'observations', 'issues', 'history'],
                        q: str = Query(default='', max_length=200),
                        requirement_id: str | None = Query(default=None, max_length=128),
                        verdict: Literal['PASS', 'MARGINAL', 'FAIL'] | None = None,
@@ -177,6 +179,8 @@ def query_program_data(pid: str, dataset: Literal['requirements', 'design', 'bom
     Tests are persisted synthetic bench computations in this demo, not physical
     laboratory measurements. This endpoint never runs the bench or scores ML.
     """
+    from common.i18n import request_language
+    request.scope['npi.language'] = request_language(request.scope,q)
     _get_program_or_404(pid)
     if verdict and dataset != 'test_results':
         raise HTTPException(422, 'verdict is only supported for test_results')
@@ -194,9 +198,18 @@ def query_program_data(pid: str, dataset: Literal['requirements', 'design', 'bom
         plans = {p['test_id']: p for p in source.list_test_plans(pid)}
         rows = [{**r, 'test_plan': plans.get(r['test_id']),
                  'req_id': plans.get(r['test_id'], {}).get('req_id')} for r in rows]
+    from common.i18n import normalize_query, translate_text
+    normalized_query = normalize_query(q)
+    def matches_query(row):
+        if not q:
+            return True
+        text = json.dumps(row,ensure_ascii=False).casefold()
+        if q.casefold() in text or q.casefold() in translate_text(text,'zh'):
+            return True
+        return normalized_query != q and all(term.casefold() in text for term in normalized_query.split())
     rows = [r for r in rows if (not requirement_id or r.get('req_id') == requirement_id)
             and (not verdict or r.get('verdict') == verdict)
-            and (not q or q.casefold() in json.dumps(r, ensure_ascii=False).casefold())]
+            and matches_query(r)]
     rows.sort(key=lambda r: json.dumps(r, sort_keys=True))
     return QueryPage(program_id=pid, dataset=dataset, total=len(rows), limit=limit, offset=offset,
                      items=rows[offset:offset + limit], provenance=('Validated read-only pilot source records' if data_mode()=='pilot' else (
@@ -345,8 +358,10 @@ def knowledge_readiness():
 
 
 @app.get("/api/kb/search")
-def kb_search(q: str = Query(min_length=1, max_length=500), cls: str | None = None,
+def kb_search(request: Request, q: str = Query(min_length=1, max_length=500), cls: str | None = None,
               k: int = Query(default=3, ge=1, le=20), external_only: bool = False, program_id: str | None = None, evidence_kind: Literal['all','direct_demo','historical_demo','external_reference'] = 'all'):
+    from common.i18n import request_language
+    request.scope['npi.language'] = request_language(request.scope,q)
     # kb.search() rows carry the raw asset blob; drop it here (fetch it via
     # /api/asset/{id} instead) so search results stay small JSON, not binary.
     if program_id:

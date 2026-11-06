@@ -1,0 +1,18 @@
+[
+  [
+    "(?:Atlas|The Atlas program) (?:has|shows|records) (?:a |an )?([A-Z]+) thermal (?:bench )?(?:result|test result)\\s*(\\[F-TEST\\])[.!]?",
+    "阿特拉斯的热测试结果为{0} {1}。"
+  ],
+  [
+    "(?:Atlas|The Atlas program) (?:has|shows|records) (?:a |an )?([A-Z]+) (?:thermal )?(?:design-risk|risk) (?:band|rating)\\s*(\\[F-RISK\\])[.!]?",
+    "阿特拉斯的热设计风险等级为{0} {1}。"
+  ],
+  [
+    "(?:Atlas|The Atlas program) (?:has|specifies|requires) (?:a |an )?thermal (?:target|requirement) (?:of |at )?([^\\n]+?)\\s*(\\[F-REQ\\])[.!]?",
+    "阿特拉斯的热目标为 {0} {1}。"
+  ],
+  [
+    "(?:The external study|The published study) (?:contains|reports|provides) (\\d+) (?:published )?experiments\\s*(\\[F-REF\\])[.!]?",
+    "外部研究报告了 {0} 项实验 {1}。"
+  ]
+]

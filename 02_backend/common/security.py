@@ -116,7 +116,7 @@ def authenticated_actor(request):
 
 def is_mutation(method, path):
     # Semantic explanation POST only narrates; it never persists state.
-    return (method not in {'GET','HEAD','OPTIONS'} and path != '/api/semantic/explain') or (path.startswith('/api/review/') and path.endswith('/stream'))
+    return (method not in {'GET','HEAD','OPTIONS'} and path not in {'/api/semantic/explain','/api/nifi/ask'}) or (path.startswith('/api/review/') and path.endswith('/stream'))
 
 
 def enforce_csrf(request, identity):

@@ -7,7 +7,8 @@ import re
 import ssl
 from urllib.parse import urlsplit, quote
 import httpx
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
+from pydantic import BaseModel, Field
 from typing import Literal
 
 router = APIRouter(prefix="/api/nifi", tags=["NiFi reader"])
@@ -148,6 +149,23 @@ async def read_snapshot(mode: Literal["sample", "live"] = "sample"):
             return normalize(flow, status, bulletins, "live")
     except (httpx.HTTPError, ValueError, KeyError, TypeError, AttributeError, OSError):
         raise HTTPException(502, "NiFi could not be read. Check the server URL, group permissions, token, and trusted CA. No sample data was substituted.") from None
+
+
+class InspectionQuestion(BaseModel):
+    question: str = Field(min_length=1,max_length=500)
+    mode: Literal['sample','live'] = 'sample'
+
+
+@router.post('/ask')
+async def ask(body: InspectionQuestion, request: Request):
+    from common.i18n import nifi_intent, request_language
+    request.scope['npi.language'] = request_language(request.scope,body.question)
+    try:
+        intent = nifi_intent(body.question)
+    except ValueError as error:
+        raise HTTPException(422,str(error)) from None
+    # The same bounded GET-only source reader handles both languages.
+    return {'intent':intent,'snapshot':await read_snapshot(body.mode)}
 
 
 if __name__ == "__main__":

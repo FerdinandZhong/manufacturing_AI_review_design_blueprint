@@ -172,3 +172,10 @@ button:disabled { cursor: default; opacity: .55; }
 .semantic-ai-details > summary { cursor: pointer; padding: 16px 20px; font-size: 12px; font-weight: 600; }
 .semantic-ai-details > summary svg { display: inline; vertical-align: middle; margin-right: 5px; }
 @media (max-width: 600px) { .semantic-canvas-toolbar > span { margin-left: 0; width: 100%; } }
+
+.language-switch { display:flex; align-items:center; gap:2px; padding:3px; border:1px solid #d4dce6; border-radius:7px; background:#fff; }
+.language-switch button { padding:5px 9px; border:0; border-radius:4px; color:#475569; font-size:12px; cursor:pointer; background:transparent; }
+.language-switch button[aria-pressed="true"] { background:#e9f1ff; color:#164fb6; font-weight:600; }
+html[lang="zh-CN"] body { font-family:Inter,"Noto Sans SC","PingFang SC","Microsoft YaHei",sans-serif; }
+html[lang="zh-CN"] .nav-label, html[lang="zh-CN"] .eyebrow { letter-spacing:.04em; }
+html[lang="zh-CN"] .workspace-badge { white-space:normal; }

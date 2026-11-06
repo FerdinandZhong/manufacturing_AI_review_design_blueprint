@@ -1,6 +1,25 @@
 import axios from 'axios'
+import { getLanguage } from './i18n'
 
 export const api = axios.create({ baseURL: '/api', headers: { 'X-NPI-Request': '1' } })
+api.interceptors.request.use(config => { config.headers.set('Accept-Language', getLanguage() === 'zh' ? 'zh-CN' : 'en'); return config })
+
+/** Keep canonical text in UI state so switching languages never repeats a review or model call. */
+function canonicalText(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonicalText)
+  if (!value || typeof value !== 'object') return value
+  const object = value as Record<string, unknown>
+  const result = Object.fromEntries(Object.entries(object).filter(([key]) => key !== '_source_texts').map(([key, item]) => [key, canonicalText(item)]))
+  const originals = object._source_texts
+  if (originals && typeof originals === 'object') {
+    for (const [key, item] of Object.entries(originals)) {
+      if (Object.hasOwn(result, key) && ((typeof item === 'string' && typeof result[key] === 'string') || (Array.isArray(item) && item.every(part => typeof part === 'string')))) result[key] = item
+    }
+  }
+  return result
+}
+api.interceptors.response.use(response => { response.data = canonicalText(response.data); return response })
+
 export interface RuntimeStatus { mode: 'demo' | 'pilot'; authorization: string; identity: { actor: string; permission: 'RO' | 'RW'; authentication: string }; source_ready: boolean; review_ready: boolean; risk_status: string; source: {state: string; provider: string; detail: string; source_id?: string; revision_id?: string; snapshot_id?: string; extracted_at?: string; provenance?: string; freshness?: string } }
 export const getRuntimeStatus = () => api.get<RuntimeStatus>('/runtime/status').then(r => r.data)
 
@@ -221,7 +240,7 @@ export async function streamSSE(
       if (!line.startsWith('data: ')) continue
       const raw = line.slice(6).trim()
       if (!raw || raw === '[DONE]') continue
-      try { onEvent(JSON.parse(raw)) } catch { /* ignore malformed frame */ }
+      try { onEvent(canonicalText(JSON.parse(raw)) as Record<string, unknown>) } catch { /* ignore malformed frame */ }
     }
   }
 }
@@ -231,7 +250,7 @@ export const streamReview = (
   reviewId: string,
   onEvent: (e: Record<string, unknown>) => void,
 ) =>
-  fetch(`/api/review/${pid}/stream?review_id=${encodeURIComponent(reviewId)}`, { headers: { 'X-NPI-Request': '1' } })
+  fetch(`/api/review/${pid}/stream?review_id=${encodeURIComponent(reviewId)}`, { headers: { 'X-NPI-Request': '1', 'Accept-Language': getLanguage() === 'zh' ? 'zh-CN' : 'en' } })
     .then(res => { if (!res.ok) throw new Error(`Review failed (${res.status})`); return streamSSE(res, onEvent) })
 
 export interface LlmModel {
@@ -280,6 +299,7 @@ export interface NifiSnapshot {
 }
 export const getNifiConfig = () => api.get<{ configured: boolean; group_id: string; read_only: boolean }>('/nifi/config').then(r => r.data)
 export const getNifiSnapshot = (mode: 'sample' | 'live', signal?: AbortSignal) => api.get<NifiSnapshot>('/nifi/snapshot', { params: { mode }, signal }).then(r => r.data)
+export const askNifi = (question: string, mode: 'sample' | 'live', signal?: AbortSignal) => api.post<{intent:'status'|'topology'|'health'|'bulletins';snapshot:NifiSnapshot}>('/nifi/ask', {question,mode}, {signal}).then(r => r.data)
 
 export interface SemanticAsset {
   id: string; title: string; modality: 'image' | 'pdf' | 'text'; caption: string
