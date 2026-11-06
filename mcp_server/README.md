@@ -57,7 +57,7 @@ recommendations are computed by the application. The only mutating tool is
 `trigger_gate_review`, which creates a review and evidence record; it cannot
 approve/reject a gate or change model configuration.
 
-Install locally or use the following `uvx` source from the published `main` branch.
+Install locally or use the following pinned `uvx` source with single-key authentication.
 The package lives in `mcp_server`, so keep the `#subdirectory=mcp_server` suffix.
 
 ```json
@@ -65,7 +65,7 @@ The package lives in `mcp_server`, so keep the `#subdirectory=mcp_server` suffix
   "mcpServers": {
     "vehicle-npi": {
       "command": "uvx",
-      "args": ["--from", "git+https://github.com/FerdinandZhong/manufacturing_AI_review_design_blueprint.git@main#subdirectory=mcp_server", "npi-mcp"],
+      "args": ["--from", "git+https://github.com/FerdinandZhong/manufacturing_AI_review_design_blueprint.git@1d5bfa1468e1e8e7e60288e9e71f878c6ec31642#subdirectory=mcp_server", "npi-mcp"],
       "env": {
         "NPI_API_BASE_URL": "https://vehicle-npi-platform-h4ipg8.ml-c5697ef8-0c9.qzhong-a.a465-9q4k.cloudera.site/api",
         "CDSW_APIV2_KEY": "<workbench-api-key>"
@@ -80,14 +80,12 @@ and supply the three `args` entries above as separate arguments. If the host
 uses `uv run --with` instead, the same Git URL is the requirement and
 `npi-mcp` is the executable. Use Python 3.11 or later.
 
-Push changes to `origin/main` before restarting the MCP server. The dependency
-tracks that branch, so no commit hash needs updating in Agent Studio. If uv
-reuses a cached revision after a push, add `--refresh` before `--from` for the
-next launch to force dependency revalidation.
+Publish package changes before updating the pinned commit in Agent Studio.
+Refresh tool discovery after changing the package revision.
 
 An error such as `Updating ... (COMMIT)` followed by `Failed to resolve
 --with requirement` means Git is trying to fetch the literal revision
-`COMMIT`. Replace the entire dependency URL with the `@main` URL above; retrying
+`COMMIT`. Replace the entire dependency URL with the pinned URL above; retrying
 the unchanged configuration cannot fix that missing revision. A Git install
 failure happens before MCP initialization or any application API request.
 
