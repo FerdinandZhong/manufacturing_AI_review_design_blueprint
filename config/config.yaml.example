@@ -39,7 +39,7 @@ pilot:
   import_path: ""            # read-only npi-pilot-v1 JSON; NPI_PILOT_SOURCE overrides
   ops_db_path: data/pilot/npi.db  # isolated from demo results/models/reviews
 # Workbench authorization defaults fail closed when platform markers are present.
-# Configure NPI_AUTH_MODE=workbench, NPI_PUBLIC_ORIGIN=https://<private-app-host>,
+# Configure NPI_AUTH_MODE=workbench. NPI_PUBLIC_ORIGIN is optional for a custom app URL;
 # and NPI_TRUSTED_PROXY_CIDRS=<verified ingress socket peer CIDR> at deployment.
 # Never expose the loopback backend or use public/unauthenticated Applications.
 

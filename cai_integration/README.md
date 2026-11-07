@@ -50,6 +50,8 @@ For a new project from this source, deploy `.project-metadata.yaml` through the 
 - Environment: `BACKEND_PORT=7078`, `NPI_APP_MODE=prod`, optional `LLM_PROVIDER=caii`
 - Keep unauthenticated access disabled. Do not set `CDSW_APP_PORT`; Workbench supplies it.
 
+The launcher discovers the assigned application hostname from Workbench metadata before starting the backend. This supports the random suffix added during AMP creation. It uses the runtime-injected `CDSW_APIV2_KEY` for this metadata lookup only. No application URL is required during setup. For a custom hostname, set `NPI_PUBLIC_ORIGIN`.
+
 The launcher checks prepared files, rejects port collisions and exits if the backend cannot start. Application shutdown closes the proxy client and terminates its backend child. No installation, data generation, or Lance rebuild runs during Application startup.
 
 ## LLM and authentication
@@ -80,7 +82,7 @@ Open the Application with a Workbench-authenticated browser:
 1. Verify the cockpit loads and `/api/health` returns `{"status":"ok"}`.
 2. Confirm thermal HIGH and MARGINAL; open a schematic, document, and photo in Knowledge base.
 3. Open Models and verify the registry loads.
-4. Run Gate Review: five workers complete, narrative appears, recommendation CONDITIONAL.
+4. Run Gate Review from the browser: five workers complete, narrative appears, recommendation CONDITIONAL. This checks browser-origin authorization as well as API access.
 5. Restart the Application and confirm persisted model registrations/review data remain.
 
 Read the preparation Job logs for install/build failures and Application logs for startup failures. A successful POST is not proof that an Application is healthy. If the workspace's API response schema differs, retain the API status and workload IDs for diagnosis; do not relax status checks to force success.

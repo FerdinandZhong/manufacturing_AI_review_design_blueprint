@@ -18,8 +18,9 @@ IDENTITY = {'remote-user','remote-user-perm','remote_user','remote_user_perm'}
 def public_origin():
     value = os.getenv('NPI_PUBLIC_ORIGIN','').strip().rstrip('/')
     if not value:
-        # AMP owns this subdomain before creation; Workbench supplies its domain
-        # at runtime. Never derive the CSRF boundary from request headers.
+        # The launcher resolves the assigned hostname before starting the API.
+        # This fallback supports explicitly configured standalone test contexts.
+        # Never derive the CSRF boundary from request headers.
         domain = os.getenv('CDSW_DOMAIN', '').strip()
         subdomain = os.getenv('NPI_APP_SUBDOMAIN') or 'vehicle-npi-platform'
         label = r'[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?'

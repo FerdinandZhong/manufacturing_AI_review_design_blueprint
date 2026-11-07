@@ -104,7 +104,7 @@ Local Demo binds loopback and labels its explicit development actor `local-demo`
 
 Standard Workbench deployment resolves these values without setup input:
 
-1. The origin is `https://vehicle-npi-platform.<CDSW_DOMAIN>`. A renamed app supplies `NPI_APP_SUBDOMAIN`; a custom URL uses `NPI_PUBLIC_ORIGIN`.
+1. At startup, the launcher reads this project’s Workbench application metadata and resolves its assigned hostname, including generated suffixes. It matches the frontend script and configured subdomain prefix. `NPI_APP_SUBDOMAIN` selects a renamed prefix; `NPI_PUBLIC_ORIGIN` supplies an explicit custom URL. Missing or ambiguous matches stop startup. The runtime key reads metadata only; each API caller still uses its own identity and permissions.
 2. Trusted proxy peers default to `127.0.0.1/32,::1/128`, matching the loopback-only listener. `NPI_TRUSTED_PROXY_CIDRS` can override these for a custom ingress.
 
 Empty overrides use the defaults. Invalid origins and untrusted peers reject protected requests.

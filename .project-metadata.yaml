@@ -23,7 +23,7 @@ environment_variables:
     required: false
   NPI_PUBLIC_ORIGIN:
     default: ""
-    description: "Optional custom HTTPS origin. Leave blank to derive https://vehicle-npi-platform.<CDSW_DOMAIN> at runtime."
+    description: "Optional custom HTTPS origin. Leave blank to discover the assigned hostname from Workbench application metadata."
     required: false
   NPI_TRUSTED_PROXY_CIDRS:
     default: "127.0.0.1/32,::1/128"

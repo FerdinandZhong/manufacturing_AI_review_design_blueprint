@@ -245,6 +245,9 @@ def main():
         finally:
             _stop_backend()
     else:
+        if auth_mode() == 'workbench':
+            from common.application_origin import configure_public_origin
+            print('Application origin: ' + configure_public_origin(), flush=True)
         check_artifacts()
         _run_uvicorn(create_app(backend), host=_bind_host(), port=port)
 
